@@ -1,0 +1,37 @@
+from google.cloud import bigquery
+import os
+
+# Autoryzacja
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/radoslaw/Desktop/pol-it-pol9012318-2021052100-2f30a8d31977.json"
+
+client = bigquery.Client(project="pol-it-pol9012318-2021052100")
+
+query = """
+    SELECT E_Mail
+    FROM `pol-it-pol9012318-2021052100.RADEK2.NPS`
+"""
+
+query_job = client.query(query)
+iter=0
+for i in query_job:
+    print(i[0],iter)
+    iter+=1
+# # Lista do przechowywania
+# dic = query_job
+
+# # Dict do testów
+# sett = {}
+# count = 0
+
+# for i in dic:
+#     sett[count] = i[0]
+#     count += 1
+
+# # Wyświetlamy wynik
+# for key, value in sett.items():
+#     print(key, value)
+
+# # Albo prosto z query_job:
+# for i in query_job:
+#     print(i[0])
+
