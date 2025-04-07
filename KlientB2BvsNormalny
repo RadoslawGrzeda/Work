@@ -1,0 +1,51 @@
+with KlientB2B as 
+(
+  SELECT 
+person_id,
+person_id_sf as id ,
+intracommunity_vat_number
+ FROM
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac
+ WHERE
+  intracommunity_vat_number is not null 
+  and person_id_sf is not null 
+)
+,KlientZwykly as 
+(
+  SELECT 
+person_id,
+person_id_sf as id ,
+intracommunity_vat_number
+ FROM
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac
+ WHERE
+  intracommunity_vat_number is null 
+  and person_id_sf is not null 
+
+),zakupy as (
+
+  select 
+distinct 
+TrnLoyaltyAccountId as id ,
+sum(trn.TrnTotalPayment) as obrot
+from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+where trn.TrnDate between '2024-01-01' and '2024-12-31'
+AND (TrnActivityId LIKE 'ecom_%' OR TrnActivityId LIKE 'ocado_%')
+group by 1 
+)
+select 
+'KlientB2B' as typ,
+count(distinct z.id),
+sum(obrot)
+from zakupy z 
+join klientB2B k
+on z.id=k.id
+
+union all 
+select 
+'KlientZwykly' as typ,
+count(distinct z.id),
+sum(obrot)
+from zakupy z 
+join KlientZwykly k
+on z.id=k.id

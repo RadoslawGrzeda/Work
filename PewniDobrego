@@ -1,0 +1,52 @@
+with prod as (
+  select 
+        ART_NUMER,
+        ART_NAZWA,
+        met.EAN_CD as ean
+   from 
+        `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join 
+        `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+    on 
+        cast (met.EAN_CD as string)=am.EAN
+    where 
+        met.EAN_MAIT='O'
+    and cast(art_numer as string) in 
+                              (select string_field_3 from `pol-it-digiteam-2022062900.RADEK.ListaProdPewniDobrego`)
+)
+
+,zakupyTotal as (
+
+    select 
+        TrnLineEAN as ean,
+        th.TrnDate as date,
+        TrnLoyaltyCustomerId as id ,
+        TrnLineValue
+    from 
+        `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th
+    join 
+        `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl
+    on 
+        th.TrnId=tl.trnid
+    where 
+        th.TrnDate between '2024-01-01' and '2025-02-28'
+    and
+        tl.TrnDate between '2024-01-01' and '2025-02-28'
+    and
+        TrnLoyaltyCustomerId is not null
+)
+
+select 
+  extract(month from z.date) as miesiac,
+  extract(year from z.date) as rok,
+  p.art_nazwa,
+  p.art_numer,
+  count(z.ean) as LiczbaArt,
+  sum(z.TrnLineValue) as Obrot,
+  count(distinct id) as LiczbaUnikalnychKart
+from 
+   zakupyTotal z 
+join prod p
+   on z.ean=cast (p.ean as string)
+group by 1,2,3,4
+order by 1 asc

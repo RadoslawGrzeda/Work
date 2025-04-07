@@ -1,0 +1,73 @@
+with test as (
+  SELECT 
+trn.date, 
+trn.id,
+trn.accountId, 
+trn.identifierNo, 
+loy.person_id as LOYALTYPERSONID,
+recognition_tierCode as STATUS_LOJALNY,
+trn.locationId, trn.locationCode,site_sde,GIC,HYP,
+-- transaction_type_code,
+-- transaction_type_sde,
+tpt.status,
+tpt.pointTypeId,
+
+
+case when tpt.pointTypeId = 1001 then 'COGNOT' 
+when tpt.pointTypeId = 1002 then 'STATUTORY_POINTS'
+else '' end as POINTS_TYPE,
+case when tpt.status = 'B' then 'ZEBRANE'
+when tpt.status = 'S' then 'WYDANE'
+when tpt.status ='C' then 'KOREKTA'
+ELSE '' end as TYP_PKT,
+-- case when transaction_type_sde='Points Expiration' then 'POINTS_ERXPIRY' else "" end as EXPIRATION,
+
+sum(tpt.points) as points , tpt.expirationDate
+
+
+FROM `auchan-pol-prod.raw_comarch.trans_trn` as trn 
+left join `auchan-pol-prod.raw_comarch.trans_tpt` as tpt on trn.id = tpt.trnId 
+-- left join `auchan-pol-prod.raw_dwh_sec.transaction_types` as tt ON trn.type = tt.transaction_type_code
+left join  `pol-it-bi-prod-2019121600.POL_BI_MDM.v_mdm_sites` sites on sites.site_unique_code=trn.locationCode
+left join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` loy on loy.identifier_id=trn.identifierNo
+left join ( SELECT  a.account_id,a.account_ownerCustomerId,a.account_IdentifierNo, a.cre_date, b.recognition_tierCode
+
+FROM auchan-pol-prod.raw_comarch.loya_status b
+join (SELECT account_id,account_ownerCustomerId,account_IdentifierNo, max(cre_date) as cre_date from auchan-pol-prod.raw_comarch.loya_status
+--where account_IdentifierNo ='0410014653640'
+group by account_id,account_ownerCustomerId,account_IdentifierNo) a on a.cre_date=b.cre_date and a.account_id=b.account_id) upd on upd.account_id=trn.accountId 
+--where trn.locationCode IN ('PL_00400_MAG','PL_00404_MAG')
+--where  IdentifierNO='0410014653640'
+where tpt.points is not null 
+--and trn.accountId=181546
+group by trn.date, trn.id,
+trn.accountId, loy.person_id,
+recognition_tierCode,
+trn.identifierNo, 
+trn.locationId, trn.locationCode,site_sde,GIC,HYP,tpt.status,tpt.pointTypeId,
+tpt.expirationDate
+)
+-- transaction_type_code,transaction_type_sde,tpt.expirationDate
+
+select dataTR,count(accountId) as LiczbaKlientow,round(sum(POINTS),2)as punkty, GRUPA,  from  (SELECT distinct accountId,round(sum(points)/100,2) as POINTS ,
+extract(Month from (date(date))) as dataTR,
+case 
+
+--when round(sum(points)/100,2)>500 then '8;>500'
+--when round(sum(points)/100,2)>100  then '7;100 - 500'
+--when round(sum(points)/100,2)>50  then '6;50 - 100'
+when  round(sum(points)/100,2)>10  then '3;10 - eternity'
+when round(sum(points)/100,2)>=5  then '2;5 - 10'
+when round(sum(points)/100,2)>=0.01  then '1;0,01 - 4,99'
+--when round(sum(points)/100,2)=0.01 then '1;0,01' 
+else '00'
+end as GRUPA
+ FROM test
+where date(date) between '2025-03-01' and '2025-03-31'
+and pointTypeId=1001
+--and typ_pkt='ZEBRANE'
+and status='W'
+-- and transaction_type_code ='ER'
+group by accountId,extract(Month from (date(date))))
+group by GRUPA,dataTR
+order by 1,4

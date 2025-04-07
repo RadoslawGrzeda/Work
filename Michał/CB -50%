@@ -125,18 +125,18 @@ where
 
 -- Select * from dane 
 Select 
-a.typ,
-a.liczbaUnikalnychKlientow as liczbaUnikalnychKlientow25,
-b.liczbaUnikalnychKlientow  as liczbaUnikalnychKlientow24,
-SAFE_DIVIDE(a.liczbaUnikalnychKlientow-b.liczbaUnikalnychKlientow,b.liczbaUnikalnychKlientow)*100 as ProcUnikalnychKlientow,
-a.iloscTrans as trans25,
-b.iloscTrans as trans24,
-a.iloscTrans-b.iloscTrans as roznicaTrans,
-SAFE_DIVIDE(a.iloscTrans-b.iloscTrans,b.iloscTrans)*100 as ProcTrans,
-a.obrot as obrot25,
-b.obrot as obrot24,
-a.obrot-b.obrot as roznicaObrotu,
-SAFE_DIVIDE(a.obrot-b.obrot,b.obrot)*100 as ProcObrot
+  a.typ,
+  a.liczbaUnikalnychKlientow as liczbaUnikalnychKlientow25,
+  b.liczbaUnikalnychKlientow  as liczbaUnikalnychKlientow24,
+  SAFE_DIVIDE(a.liczbaUnikalnychKlientow-b.liczbaUnikalnychKlientow,b.liczbaUnikalnychKlientow)*100 as ProcUnikalnychKlientow,
+  a.iloscTrans as trans25,
+  b.iloscTrans as trans24,
+  a.iloscTrans-b.iloscTrans as roznicaTrans,
+  SAFE_DIVIDE(a.iloscTrans-b.iloscTrans,b.iloscTrans)*100 as ProcTrans,
+  a.obrot as obrot25,
+  b.obrot as obrot24,
+  a.obrot-b.obrot as roznicaObrotu,
+  SAFE_DIVIDE(a.obrot-b.obrot,b.obrot)*100 as ProcObrot
 from 
   dane a 
 join

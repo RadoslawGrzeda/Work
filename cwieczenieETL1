@@ -1,0 +1,50 @@
+from google.cloud import bigquery
+import os
+from datetime import date 
+import pandas as pd
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/radoslaw/Desktop/pol-it-pol9012318-2021052100-2f30a8d31977.json"
+
+client = bigquery.Client(project="pol-it-pol9012318-2021052100")
+
+query = """
+    SELECT *
+    FROM `pol-it-pol9012318-2021052100.RADEK2.ETL1`
+"""
+# pol-it-pol9012318-2021052100.RADEK2.ETL1
+today=date.today()
+
+query_job = client.query(query)
+result=query_job.result()
+
+resultKolumn=[dict(row) for row in result]
+
+
+pdd=pd.DataFrame(resultKolumn)
+piaseczno=pdd[pdd['site_code']=='00001']
+# print(piaseczno)
+print(piaseczno.columns)
+su=pdd.groupby('site_code')['amt_paid_w_tax'].sum()   
+# print('eelo',su)
+loy=pdd[pdd['loy_support_unique_code'].notna()]
+agr=pdd.groupby(['loy_support_unique_code','basket_sales_dth'])['amt_paid_w_tax'].sum().reset_index()
+# print(loy['loy_support_unique_code'])     
+agr=agr.sort_values(by='amt_paid_w_tax',ascending=False)
+print(agr)
+# print(resultKolumn[0].values())
+
+# print(kolumny)
+# for i in query_job:
+#     print(i)
+
+# row=next(query_job)
+# names=row.key()
+# print(names)
+
+# for i in names:
+#     print(i)a
+# dic=dict(query_job)
+# for k in query_job:
+#     print(k)
+#     break
+        # break
+# '/Users/radoslaw/desktop/NPS/NPS'
