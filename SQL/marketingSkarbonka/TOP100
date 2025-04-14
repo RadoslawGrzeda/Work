@@ -1,0 +1,89 @@
+with senior as (
+  select
+    l.identifier_id as id,
+    skp.person_id,
+    skp.typKlienta
+  from
+    `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` skp
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` l on l.person_id = skp.person_id
+  where
+    skp.DataGenerowania in (
+      select
+        max(DataGenerowania)
+      from
+        `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` skp2
+      where
+        skp2.person_id = skp.person_id
+    )
+    and TypKlienta = 'SENIOR'
+    and Status = 'AKTYWNY'
+    and l.is_deleted = false
+    and l.loyalty_status = 'LOS_01'
+),
+KDR as (
+  select
+    l.identifier_id as id,
+    skp.person_id,
+    skp.typKlienta
+  from
+    `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` skp
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` l on l.person_id = skp.person_id
+  where
+    skp.DataGenerowania in (
+      select
+        max(DataGenerowania)
+      from
+        `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` skp2
+      where
+        skp2.person_id = skp.person_id
+    )
+    and TypKlienta = 'KDR'
+    and Status = 'AKTYWNY'
+    and l.is_deleted = false
+    AND l.loyalty_status = 'LOS_01'
+),
+prod as (
+  select
+    ART_NUMER,
+    ART_NAZWA,
+    met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN
+  where
+    met.EAN_MAIT = 'O'
+),
+zakupy as (
+  select
+    TrnLineEAN as ean,
+    TrnLoyaltyCustomerId as id,
+    TrnLineValue
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th
+    join `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl on th.TrnId = tl.trnid
+  where
+    th.TrnDate >= '2025-01-02'
+    and tl.TrnDate >= '2025-01-02'
+)
+select
+  z.ean,
+  p.ART_NAZWA,
+  count(p.ean) as liczbaArt,
+  sum(TrnLineValue) as ZaArt
+from
+  zakupy z
+  join prod p on cast(p.ean as string) = z.ean
+where
+  z.id in (
+    select
+      id
+    from
+      KDR
+  )
+group by
+  1,
+  2
+order by
+  liczbaArt desc
+LIMIT
+  100

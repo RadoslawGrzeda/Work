@@ -1,0 +1,186 @@
+-- SELECT 
+--   *
+-- FROM 
+--     (
+--         SELECT distinct 
+--             COUNT(DISTINCT id) AS Liczba_transakcji,
+--             BARCODE,
+--             CASE
+--                 WHEN SUM(Obrot) IS NULL THEN 0
+--                 ELSE ROUND(SUM(Obrot),2)
+--             END AS Obrot,
+--             CASE
+--                 WHEN SUM(mainPoints) IS NULL THEN 0
+--                 ELSE ROUND(SUM(mainPoints),2)
+--             END AS mainPoints,
+--             CASE
+--                 WHEN SUM(PLN_Zarobione) IS NULL THEN 0
+--                 ELSE ROUND(SUM(PLN_Zarobione),2)
+--             END AS PLN_Zarobione,
+--             CASE
+--                 WHEN SUM(PLN_Wydane_Skarbonka) IS NULL THEN 0
+--                 ELSE ROUND(SUM(PLN_Wydane_Skarbonka),2)
+--             END AS PLN_Wydane_Skarbonka,
+--             CASE
+--                 WHEN SUM(Waiting) IS NULL THEN 0
+--                 ELSE ROUND(SUM(Waiting),2)
+--             END AS Waiting,
+--             CASE
+--                 WHEN SUM(Cancelled) IS NULL THEN 0
+--                 ELSE ROUND(SUM(Cancelled),2)
+--             END AS Cancelled,
+--             CASE
+--                 WHEN SUM(Expired) IS NULL THEN 0
+--                 ELSE ROUND(SUM(Expired),2)
+--             END AS Expired,
+--             CASE
+--                 WHEN SUM(PKT_Zarobione) IS NULL THEN 0
+--                 ELSE ROUND(SUM(PKT_Zarobione),2)
+--             END AS PKT_Zarobione,
+--             Data_zakupow,
+--             locationCode,
+--             site_sde,
+--             site_address_complement,
+--             EXTRACT(month FROM Data_zakupow) AS Miesiac,
+--             EXTRACT(year FROM Data_zakupow) AS Rok
+--         FROM 
+--             (
+SELECT
+    distinct trn.id,
+    DATE(date) AS Data_zakupow,
+    RIGHT(trn.identifierNo, 13) AS BARCODE,
+    totalValue / 100 AS Obrot,
+    LEFT(RIGHT(locationCode, 9), 5) AS locationCode,
+    site_sde,
+    site_address_complement,
+    mainPoints / 100 AS mainPoints,
+    tpt_a.points / 100 AS PLN_Zarobione,
+    tpt_c.points / 100 AS PLN_Wydane_Skarbonka,
+    tpt_d.points / 100 AS Waiting,
+    tpt_e.points / 100 AS Cancelled,
+    tpt_f.points / 100 AS Expired,
+    mainPoints / 100 AS PKT_Zarobione --identifierNo,
+FROM
+    `auchan-pol-prod.raw_comarch.trans_trn` trn
+    LEFT JOIN (
+        SELECT
+            *
+        FROM
+            `auchan-pol-prod.raw_comarch.trans_tpt`
+        WHERE
+            pointTypeId = 1002
+            AND status = 'B'
+    ) tpt_a ON tpt_a.trnId = trn.id
+    LEFT JOIN (
+        SELECT
+            *
+        FROM
+            `auchan-pol-prod.raw_comarch.trans_tpt`
+        WHERE
+            pointTypeId = 1001
+            AND status = 'B'
+    ) tpt_b ON tpt_b.trnId = trn.id
+    LEFT JOIN (
+        SELECT
+            *
+        FROM
+            `auchan-pol-prod.raw_comarch.trans_tpt`
+        WHERE
+            pointTypeId = 1001
+            AND status = 'S'
+    ) tpt_c ON tpt_c.trnId = trn.id
+    LEFT JOIN (
+        SELECT
+            *
+        FROM
+            `auchan-pol-prod.raw_comarch.trans_tpt`
+        WHERE
+            pointTypeId = 1001
+            AND status = 'W'
+    ) tpt_d ON tpt_d.trnId = trn.id
+    LEFT JOIN (
+        SELECT
+            *
+        FROM
+            `auchan-pol-prod.raw_comarch.trans_tpt`
+        WHERE
+            pointTypeId = 1001
+            AND status = 'C'
+    ) tpt_e ON tpt_e.trnId = trn.id
+    LEFT JOIN (
+        SELECT
+            *
+        FROM
+            `auchan-pol-prod.raw_comarch.trans_tpt`
+        WHERE
+            pointTypeId = 1001
+            AND status = 'E'
+    ) tpt_f ON tpt_f.trnId = trn.id
+    LEFT JOIN (
+        SELECT
+            A.site_sde,
+            A.site_sde_unique_code,
+            A.ctry_code,
+            B.site_unique_code,
+            B.site_code,
+            B.site_phone_num,
+            C.site_address_unique_code,
+            C.site_address_zip_code,
+            C.site_address_city,
+            C.site_address_complement,
+            C.site_address_country_code,
+            C.site_geo_coordinate_x_value,
+            C.site_geo_coordinate_y_value,
+            D.site_format_unique_code,
+            F.L06,
+            F.GIC,
+            F.HR,
+            F.OGL,
+            F.ECN,
+            F.HYP,
+            E.site_status_code,
+            E.site_status_current_flg
+        FROM
+            `auchan-pol-prod.edm_site.d_site_description` AS A
+            INNER JOIN `auchan-pol-prod.edm_site.d_site` AS B ON A.site_unique_code = B.site_unique_code
+            INNER JOIN `auchan-pol-prod.edm_site.d_site_address` AS C ON A.site_unique_code = C.site_unique_code
+            INNER JOIN `auchan-pol-prod.edm_site.b_site_format_link` AS D ON A.site_unique_code = D.site_unique_code
+            INNER JOIN `auchan-pol-prod.edm_site.d_site_lifecycle` AS E ON A.site_unique_code = E.site_unique_code
+            AND A.site_sde_current_flg = E.site_status_current_flg
+            LEFT JOIN `pol-it-wh-prod-2019120200.POL_WH_MDM.dp_d_site_external_codification` AS F ON F.site_code = B.site_code
+    ) sklepy ON sklepy.site_unique_code = locationCode
+    JOIN (
+        SELECT
+            DISTINCT CASE
+                WHEN LEFT (CAST(NOKARTY AS string), 1) = '4' THEN CONCAT('0', CAST(NOKARTY AS string))
+                ELSE CAST(NOKARTY AS string)
+            END AS barcode,
+            DATE(data_aktywacji) AS data_aktywacji,
+            CASE
+                WHEN data_deaktywacji = 'NULL' THEN DATE(CURRENT_DATE())
+                ELSE DATE(data_deaktywacji)
+            END AS data_deaktywacji,
+        FROM
+            `pol-it-digiteam-2022062900.ROZLICZENIA_ONEY.PRACOWNICY_ONEY_20250218`
+        WHERE
+            shopId = 999
+    ) AS KLIENT ON KLIENT.barcode = RIGHT(trn.identifierNo, 13)
+    AND DATE(trn.date) BETWEEN Date (data_aktywacji)
+    AND Date (data_deaktywacji)
+WHERE
+    date between '2025-03-01'
+    and '2025-03-31'
+    AND type = 'ER'
+    AND site_sde IS NOT NULL
+    AND BARCODE = '0410013224056'
+order by
+    Data_zakupow desc --             ) AS baza
+    --         GROUP BY
+    --             Data_zakupow,
+    --             locationCode,
+    --             site_sde,
+    --             site_address_complement,
+    --             BARCODE 
+    --     )
+    -- ORDER BY
+    --   Data_zakupow DESC

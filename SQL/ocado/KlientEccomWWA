@@ -1,0 +1,53 @@
+--wg kryteriów: 1) zgoda na komunikację email 2) wg zakresu kodów, który prześlę 3) nigdy nie złożył zamówienia on-line lub 4) złożył, ale ponad 30 dni temu?
+Declare v_curr DATE;
+
+SET
+  v_curr = current_date() -1;
+
+with kody as (
+  select
+    string_field_0
+  from
+    `pol-it-pol9012318-2021052100.RADEK2.KodyWWA`
+),
+klient as (
+  SELECT
+    distinct tk.person_id,
+    ac.person_id_sf
+  FROM
+    `pol-it-pol9012318-2021052100.CUSTOMER_BASE_SIZE.Total_Kontaktowalni_P` tk
+    JOIN `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac ON tk.person_id = ac.person_id
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch on ac.person_id = ch.person_id
+    join kody on ch.address_zip_code = kody.string_field_0
+  where
+    Data_generowania = v_curr
+    and Zgoda_Tel = 1
+),
+zakupy as (
+  select
+    distinct TrnLoyaltyAccountId as id,
+    -- sum(trn.TrnTotalPayment) as obrot
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  where
+    trn.TrnDate between v_curr -30 and v_curr
+    AND (
+      TrnActivityId LIKE 'ecom_%'
+      OR TrnActivityId LIKE 'ocado_%'
+    )
+  group by
+    1
+)
+select
+  *
+from
+  klient k -- join zakupy z on k.person_id_sf=z.id
+where
+  NOT EXISTS (
+    select
+      id
+    from
+      zakupy z
+    where
+      k.person_id_sf = z.id
+  ) -- k.person_id_sf not in (select TrnLoyaltyAccountId from zakupy)

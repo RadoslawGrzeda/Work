@@ -1,0 +1,79 @@
+WITH karty AS (
+  SELECT
+    DISTINCT ac.person_id,
+    ac.person_external_loyalty,
+    ac.account_loyalty,
+    l.identifier_id AS nr_karty,
+    COUNT(*) OVER (PARTITION BY l.person_id) AS liczba_kart_sf,
+    ai.accountId AS acid,
+    ai.customerId
+  FROM
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac
+    JOIN `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` l ON ac.person_id = l.person_id
+    JOIN `auchan-pol-prod.raw_comarch.account_identifier` ai ON ai.no = l.identifier_id
+    AND CAST(ai.accountId AS string) = ac.account_loyalty
+    AND CAST(ai.customerId AS string) = ac.person_external_loyalty
+    AND ai.status = 'A'
+  WHERE
+    l.is_deleted = FALSE
+    AND l.loyalty_status = 'LOS_01'
+),
+Na24 AS (
+  SELECT
+    DISTINCT accountId AS AcId,
+    (pointsBalance / 100) +(delayedPoints / 100) AS cash
+  FROM
+    `auchan-pol-prod.raw_comarch.account_balance_histo` tp1
+  WHERE
+    balanceDATE IN (
+      SELECT
+        DISTINCT MAX(balanceDATE)
+      FROM
+        `auchan-pol-prod.raw_comarch.account_balance_histo` tp2
+      WHERE
+        tp1.accountId = tp2.accountId
+        AND DATE(balanceDATE) BETWEEN '2024-11-01'
+        AND '2024-12-31'
+    )
+    AND pointTypeId = 1001
+),
+UzbieraneListopadGrudzien AS (
+  SELECT
+    trn.accountId AS AcId,
+    ROUND(
+      SUM(
+        CASE
+          WHEN tpt.status NOT IN ('S') THEN tpt.points / 10
+          ELSE 0
+        END
+      ),
+      2
+    ) AS zebrane
+  FROM
+    `auchan-pol-prod.raw_comarch.trans_trn` trn
+    JOIN `auchan-pol-prod.raw_comarch.trans_tpt` AS tpt ON trn.id = tpt.trnId
+  WHERE
+    trn.date BETWEEN '2024-11-01'
+    AND '2024-12-31'
+    AND pointTypeId = 1001
+  GROUP BY
+    1
+)
+SELECT
+  n.AcId,
+  nr_karty,
+  n.cash AS NaKoncieSkarbonki,
+  CASE
+    WHEN u.Zebrane >= n.cash THEN n.cash
+    ELSE u.Zebrane
+  END AS zebrane,
+  CASE
+    WHEN u.Zebrane >= n.cash THEN 0
+    ELSE n.cash - u.zebrane
+  END AS przepada
+FROM
+  Na24 n
+  JOIN karty k ON n.AcId = k.acid
+  JOIN UzbieraneListopadGrudzien u ON k.acid = u.AcId
+WHERE
+  n.cash > 20.0
