@@ -1,0 +1,56 @@
+
+with Henkel as 
+    (
+      SELECT 
+        an.ART_NUMER,
+        meti.EAN_CD as ean,
+        an.ART_NAZWA,
+        SEGMENT_KOD,
+        KATEGORIA_KOD
+      FROM 
+        `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` an
+      JOIN 
+        `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` meti
+      ON 
+        cast(an.ART_NUMER as string)=cast(meti.EAN_NOART as string)
+      where segment_kod='199'
+      and kategoria_kod='613'
+      -- WHERE
+      --   EAN_MAIT='O'
+      --   and an.ART_NAZWA LIKE '%PIELUCH%'
+    )  
+    ,Nestle as 
+    (
+      SELECT 
+        an.ART_NUMER,
+        meti.EAN_CD as ean,
+        an.ART_NAZWA
+      FROM 
+        `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` an
+      JOIN 
+        `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` meti
+      ON 
+        an.ART_NUMER=meti.EAN_NOART
+      WHERE segment_kod='199'
+    )  
+    ,klient as 
+    (
+      SELECT
+      person_id,
+      identifier_id
+        FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` 
+    )
+-- ,zakupy as (
+  select 
+distinct 
+k.person_id,
+TrnLoyaltyCustomerId as karta
+  from 
+  `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader`  th
+  join `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl
+  on th.TrnId=tl.TrnId
+  join  Henkel h on tl.TrnLineEAN= cast( h.ean as string)
+  join klient k on k.identifier_id=th.TrnLoyaltyCustomerId
+  where th.TrnDate >='2024-10-01'
+  and tl.TrnDate >='2024-10-01'
+  

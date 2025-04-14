@@ -1,0 +1,182 @@
+-- Cześć Radek,
+
+-- prośba o wyciągnięcie danych do kuponów, będziemy teraz dawać wybranym klientom kupony na produkty Pewni Dobrego.
+-- Czyli chodzi o klientów, którzy mają aplikację, używają kuponów, kupują w następujących kategoriach, ale nie kupują art marki Pewni Dobrego.
+
+-- 1) jogurty (art.PD: 390247, 390246, 425112, 51405, 89879, 733948, 733946, 733947)
+-- 2) serki (art.PD: 446176, 446171)
+-- 3) dżem (art.PD: 931185, 931201, 931186, 931180)
+-- 4) czekolady (art.PD: 711198)
+-- 5) kawa (art. PD: 948265, 948266, 266562, 291469, 266565, 388981, 388980)
+
+
+
+DECLARE v_dataStart, v_dataEnd DATE;
+SET v_dataStart ='2025-01-01';
+SET v_dataEnd = '2025-04-09';
+
+with klient as ( 
+
+  select
+    distinct  
+    lt.person_id as person_id,
+    identifier_id as karta,
+  from 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  join 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.user` us 
+  on
+     lt.person_id=us.person_id
+  where
+     is_deleted=false
+)
+,uzywajacyKuponow as (
+SELECT  
+distinct 
+    trn.identifierNo as karta, 
+-- tcp.ctpCode
+FROM 
+  `auchan-pol-prod.raw_comarch.trans_trn` trn
+join
+  `auchan-pol-prod.raw_comarch.trans_tcp` tcp
+on trn.id=tcp.trnId
+where 
+    tcp.useResult='U'
+and 
+    REGEXP_CONTAINS(ctpCode,r'[Tt]\d')
+and 
+    date(trn.date) between v_dataStart and v_dataEnd
+-- and ctpCode like '%T%' or ctpCode like '%t%'
+-- LIMIT 1000
+)
+,artPewniDobrego as (
+  select 
+    ART_NUMER,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+   from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+   join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+    on cast (met.EAN_CD as string)=am.EAN
+    where art_numer in 
+    (390247,390246,425112,51405,89879,733948,733948,733946,733947,446176, 446171,931185, 931201, 931186, 931180,711198)
+)
+,artykuly as (
+   select 
+    ART_NUMER,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+   from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+   join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+    on cast (met.EAN_CD as string)=am.EAN
+    where
+         ART_NAZWA LIKE '%JOGURT%'
+    or 
+        ART_NAZWA LIKE '%SEREK%'
+    or 
+        ART_NAZWA LIKE '%DZEM%'
+    or 
+        ART_NAZWA LIKE '%KAWA%'
+    or 
+        ART_NAZWA LIKE '%CZEKOLADA%'
+    -- where ART_NUMER in (390247,390246,425112,51405,89879,733948,733948,733946,733947)
+)
+,serki as (
+   select 
+    ART_NUMER,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+   from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+   join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+   on cast (met.EAN_CD as string)=am.EAN
+   where ART_NAZWA LIKE '%SEREK%'
+)
+,dzem as (
+   select 
+    ART_NUMER,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+   from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+   join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+   on cast (met.EAN_CD as string)=am.EAN
+   where
+    ART_NAZWA LIKE '%DZEM%'
+)
+,czekolady as (
+   select 
+    ART_NUMER,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+   from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+    on cast (met.EAN_CD as string)=am.EAN
+where ART_NAZWA LIKE '%CZEKOLADA%'
+)
+,kawa as (
+   select 
+   ART_NUMER,
+   ART_NAZWA as nazwa,
+   met.EAN_CD as ean
+   from 
+`pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+join 
+`pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+on cast (met.EAN_CD as string)=am.EAN
+where ART_NAZWA LIKE '%KAWA%'
+)
+,zakupyPewniDobrego as (
+  SELECT 
+  distinct 
+    th.TrnLoyaltyCustomerId
+  FROM 
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th
+  JOIN
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl
+  ON 
+    th.TrnId=tl.TrnId
+  JOIN
+    artPewniDobrego m 
+  ON 
+   cast(m.ean as string)=tl.TrnLineEAN
+
+  WHERE 
+    date(th.TrnDate) between v_dataStart and v_dataEnd
+   and  date(tl.TrnDate) between v_dataStart and v_dataEnd
+)
+
+
+select 
+distinct
+k.person_id,
+k.karta
+from 
+  klient k 
+join 
+  uzywajacyKuponow uK
+  on k.karta=uK.karta
+  join 
+`pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th
+  on th.TrnLoyaltyCustomerId=k.karta
+  JOIN
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl
+  ON 
+    th.TrnId=tl.TrnId
+  JOIN
+  artykuly j on 
+  cast (j.ean as string)=tl.TrnLineEAN
+  
+-- where k.karta not in (select TrnLoyaltyCustomerId from zakupyPewniDobrego)
+where EXISTS (select TrnLoyaltyCustomerId from zakupyPewniDobrego zPd where zPd.TrnLoyaltyCustomerId=k.karta )
+
+and 
+    date(th.TrnDate) between v_dataStart and v_dataEnd
+   and  date(tl.TrnDate) between v_dataStart and v_dataEnd

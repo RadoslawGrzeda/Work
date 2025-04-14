@@ -1,0 +1,112 @@
+with ZdublowaneMaile as 
+(
+SELECT 
+  upper(value) as mail,
+  count(distinct person_id) as liczbaKont
+FROM 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` where channel_type='CHT_04'
+group by 1 
+having 
+  count(distinct person_id)>1
+)
+,da as ( 
+  SELECT 
+    person_id,
+    UPPER(email_user) as email_user,
+    is_active as active,
+    last_login_date as login
+  FROM 
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.user` 
+)
+,loy as ( 
+  SELECT 
+  person_id,
+identifier_id as karta,
+loyalty_status,
+count(identifier_id) OVER (PARTITION BY person_id) as KartAkt
+ FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` where loyalty_status='LOS_01'
+ and person_id is not null 
+ order by 3 desc
+)
+,naKoncie as 
+(SELECT
+distinct
+accountId,
+sum(points),
+ pointsBalance,
+pointsBalance+sum(points) as naKoncie
+FROM `auchan-pol-prod.raw_comarch.trans_tpt`tpt2 where date(auditCd) = (select max(date(auditCd)) from `auchan-pol-prod.raw_comarch.trans_tpt` tpt where tpt.accountId=tpt2.accountId )
+-- and tpt2.accountId=3663621
+and status='W'
+group by 1,3
+)
+,st as 
+(SELECT 
+account_id,
+account_IdentifierNo as karta,
+recognition_startDate as statusStart
+  FROM `auchan-pol-prod.raw_comarch.loya_status` ls 
+  where recognition_startDate in (select min(recognition_startDate)from `auchan-pol-prod.raw_comarch.loya_status`ls2 where ls.account_id=ls2.account_id)
+  )
+  ,money as (
+  SELECT
+distinct
+accountId,
+sum(points),
+ pointsBalance,
+pointsBalance+sum(points) as naKoncie
+FROM `auchan-pol-prod.raw_comarch.trans_tpt`tpt2 
+where date(auditCd) = (select max(date(auditCd)) from `auchan-pol-prod.raw_comarch.trans_tpt` tpt where tpt.accountId=tpt2.accountId )
+-- and tpt2.accountId=3663621
+and status='W'
+group by 1,3
+  )
+  ,lacz as (
+  select 
+  m.accountId,
+  karta,
+  m.naKoncie,
+  s.statusStart
+  from money m join st s on s.account_id=m.accountId
+  )
+  ,lastInter as (
+    select 
+
+substr(person_unique_code,7) as person_id,
+last_interaction
+from 
+`auchan-pol-prod.bl_customer_interactions.last_customer_interactions` it 
+where 
+last_interaction in (select max(last_interaction) from `auchan-pol-prod.bl_customer_interactions.last_customer_interactions` it2 where it2.person_unique_code=it.person_unique_code
+ )
+  )
+
+
+select distinct 
+  ch.person_id as person_id, 
+  ac.person_id_sf as id,
+  value as email,
+  flag_main_type as mainType,
+  d.active as activeDigitalAccount,
+  d.login as lastLoginDate,
+  l.karta,
+  loyalty_status,
+--  case when loyalty_status='LOS_01' then 'true' else 'false' end as kartaSkarb,
+  KartAkt as nbActiveLoyaltyCard,
+  la.naKoncie/100 as onAccount,
+  la.statusStart as StatusStart,
+  lI.last_interaction as lastInteraction
+  
+from 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch
+  left join da d on ch.person_id=d.person_id and upper(ch.value)=upper(d.email_user)
+  left join loy l on ch.person_id=l.person_id
+-- JOIN Zbublowane
+left join  `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+on ac.person_id=ch.person_id 
+left join lacz la on la.karta=l.karta
+left join lastInter lI on lI.person_id=ch.person_id
+WHERE 
+  channel_type='CHT_04'
+AND UPPER(value) in (Select UPPER(mail) from ZdublowaneMaile)
+ORDER BY 1,3

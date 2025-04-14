@@ -1,5 +1,4 @@
 
-
 DECLARE v_data_start, v_data_korekta DATE;
 DECLARE v_message_code STRING;
 SET v_message_code = 'POL_MSG_0001420';
