@@ -1,17 +1,4 @@
-/*
 
-Celem skryptu jest zasileniem danymi tabeli `pol-it-digiteam-2022062900.DATA_SHARING.t_bon_ocado_subskrybcja` 
-, dzieki ktorym nastepnie zostanie zasilony widok `pol-it-digiteam-2022062900.DATA_SHARING.v_bon_ocado_subskrybcja`, a który
-to wykorzystywany jest w procesie przyznawania bonow klientom za wyrazenie zgody na newslater.
-
-Tabela jest zasialana z 2 zrobel oznaczonych w tabeli "SF" oraz "SFMC" (od SalesForce oraz SalesForce Marketing Cloud).
-To drugie zrodlo dodane zostalo w celu zabezpieczenia sytuacji, w ktorej klient dostal komunikacje o bonie niezaleznie od tego czy 
-mu sie on nalezy czy nie.
-
-Dodatkowo przyjeta jest zasada: na jeden mail przypada jeden bon. Tym samym w tabeli nie moze byc sytuacji
-, gdy numer maila sie powtarza.
-
-*/
 
 DECLARE v_data_start, v_data_korekta DATE;
 DECLARE v_message_code STRING;
@@ -72,9 +59,6 @@ WHERE
 ;
 
 
-----------------------------------------------------------------
------ WYROWNANIE DANYCH NA PODSTAWIE TABELI email_send_log -----
-----------------------------------------------------------------
 
 CREATE TEMP TABLE tmp_send_log AS 
 WITH komunikacja AS 
