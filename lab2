@@ -1,0 +1,61 @@
+import random
+#1
+'''
+a=int(input('Podaj liczbe poczatkowa: '))
+b=int(input('Podaj liczbe koncowa: '))
+c=int(input('Podaj wielkosc odstepu: '))
+
+for i in range(a,b,c):
+    print(i)
+
+#2
+x=input('Podaj komunikat: ')
+x=x[::-1]
+print(x)
+
+#3
+slowo=['ala','kot','tomasz','pies','plot','fotograf']
+
+wybrane=slowo[(int)(random.uniform(0,len(slowo)))]
+print(wybrane)
+
+print(f"W slowie znajduje sie {len(wybrane)} liter")
+
+for i in range(5):
+    znajdujeSie=False
+    x=input("Czy litera znajduje sie w slowie: ")
+    x=x.lower()
+    for i in wybrane:
+        if i.lower()==x:
+            znajdujeSie=True
+    print(znajdujeSie)
+# print("Wybrane slowo to? ")
+a=input("Wybrane slowo to? ")
+if(wybrane.lower()==a.lower()):
+    print("Zgadles")
+else:
+    print("Niezgadles")
+'''
+#4
+slowo=['ala','kot','tomasz','pies','plot','fotograf']
+
+wybrane=slowo[(int)(random.uniform(0,len(slowo)))]
+print(wybrane)
+
+print(f"W slowie znajduje sie {len(wybrane)} liter")
+slowo=(len(wybrane)* '_')
+print(slowo)
+# print(slowo[1]) 
+proba=0;
+while proba<11:
+     znajdujeSie=False
+     pozycja=0;
+     x=input("Czy litera znajduje sie w slowie: ").lower()
+     for i in wybrane:
+          if x==i:
+               znajdujeSie=True;
+               pozycja=len(i)
+     if(znajdujeSie):
+          
+     
+    

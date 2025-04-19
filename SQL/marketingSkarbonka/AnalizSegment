@@ -1,0 +1,56 @@
+DECLARE v_start,v_end DATE;
+
+SET v_end=current_date();
+SET v_start = DATE_SUB(v_end,interval 6 month);
+
+
+with 
+  zakupy as (
+    select 
+      TrnLoyaltyCustomerId as id,
+      tl.TrnLineEAN as ean
+    from 
+      `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th
+    join 
+      `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl 
+    on th.TrnId=tl.TrnId
+    where
+      th.TrnDate between v_start and v_end 
+    and
+      tl.TrnDate between v_start and v_end 
+    and 
+      TrnLoyaltyCustomerId is not null
+)
+ ,prod as (
+    select
+      ART_NUMER as nr,
+      ART_NAZWA as nazwa,
+      met.EAN_CD as ean,
+      am.SEGMENT_KOD as segkod,
+      am.KATEGORIA_KOD as kkod
+    from
+      `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join 
+      `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+    on 
+      cast (met.EAN_CD as string) = am.EAN
+    where 
+      am.SEGMENT_KOD='199'
+    and 
+      am.KATEGORIA_KOD='613'
+)
+
+Select 
+  distinct 
+  lt.person_id as personId,
+  z.id as karta
+from 
+  zakupy z 
+join 
+  prod p 
+on
+  z.ean=cast (p.ean as string)
+join 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+on
+  lt.identifier_id=z.id
