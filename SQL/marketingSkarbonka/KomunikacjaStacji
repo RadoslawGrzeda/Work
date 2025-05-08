@@ -1,0 +1,46 @@
+DECLARE v_date DATE;
+SET v_date=DATE_SUB(current_date(), INTERVAL 2 month);
+-- select v_date
+
+select 
+  distinct 
+  lt.person_id,
+  -- TrnLoyaltyCustomerId
+  -- TrnStore 
+  -- ,TrnDate
+from 
+  `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th 
+join
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+on 
+  th.TrnLoyaltyCustomerId=lt.identifier_id
+
+where 
+  TrnDate between v_date and current_date()
+and
+  TrnLoyaltyCustomerId is not null
+and 
+  TrnStore in (
+                  '013',
+                  '003',
+                  '022',
+                  '001',
+                  '007',
+                  '020',
+                  '025',
+                  '021',
+                  '017',
+                  '004',
+                  '011',
+                  '014',
+                  '023',
+                  '015',
+                  '016',
+                  '027',
+                  '026',
+                  '009',
+                  '006',
+                  '019',
+                  '002',
+                  '018',
+                  '012')

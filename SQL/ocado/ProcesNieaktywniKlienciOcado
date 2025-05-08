@@ -1,0 +1,89 @@
+-- OcadoTestUsunietychKlientow
+
+DECLARE v_date DATE;
+SET v_date=current_date();
+
+
+INSERT INTO `pol-it-digiteam-2022062900.RADEK.ocadoTest`
+
+with 
+  ocadoSf as (
+    select 
+    distinct 
+      retailerCustomerId as id,
+      customerStatus as status,
+    from 
+      `pol-it-wh-prod-2019120200.POL_WH_OCADO_DATAFEEDS_PROD.raw_customer_v6`
+    group by 1,2
+
+)  
+
+,sfcSf as (
+    SELECT 
+    distinct
+      ac.person_id,
+      ac.person_id_sf as id,
+      ac.person_type 
+    FROM
+     `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+ 
+ )
+ ,agr as (
+    select 
+    distinct 
+      os.id,
+    case when
+      sf.person_type  !='x' then 'Aktywny' else 'Nieaktywny' end as status
+    from
+      ocadoSf os 
+    join
+      sfcSf sf
+    on
+      os.id=sf.id
+
+ UNION distinct
+
+    select 
+    distinct 
+      os.id,
+    case when 
+      sf.person_type  !='x' then 'Aktywny' else 'Nieaktywny' end as status 
+    from 
+      ocadoSf os 
+    join
+      sfcSf sf
+    on
+      os.id=sf.person_id
+
+UNION distinct
+
+    select 
+    distinct 
+      os.id,
+      'Nieaktywny'  as status 
+    from 
+      ocadoSf os 
+    where 
+      not exists (select id from sfcSf sf where sf.id=os.id)
+    and
+      not exists (select person_id from sfcSf sf where sf.person_id=os.id)
+ )
+
+select 
+  id as person_id_sf,
+  status,
+  case when 
+    status='Aktywny' then "OK" else "NOT_OK" end as sprawa,
+  v_date as dataGenerowania
+from
+  agr ag
+where 
+  not exists(
+    select
+      1 
+    from 
+      `pol-it-digiteam-2022062900.RADEK.ocadoTest` ocT
+    where 
+      ocT.person_id_sf=ag.id 
+    and
+      ocT.status=ag.status)
