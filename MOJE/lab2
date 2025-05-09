@@ -1,0 +1,217 @@
+import random
+
+
+# 1
+"""
+a=int(input('Podaj liczbe poczatkowa: '))
+b=int(input('Podaj liczbe koncowa: '))
+c=int(input('Podaj wielkosc odstepu: '))
+
+for i in range(a,b,c):
+    print(i)
+
+#2
+x=input('Podaj komunikat: ')
+x=x[::-1]
+print(x)
+
+#3
+slowo=['ala','kot','tomasz','pies','plot','fotograf']
+
+wybrane=slowo[(int)(random.uniform(0,len(slowo)))]
+print(wybrane)
+
+print(f"W slowie znajduje sie {len(wybrane)} liter")
+
+for i in range(5):
+    znajdujeSie=False
+    x=input("Czy litera znajduje sie w slowie: ")
+    x=x.lower()
+    for i in wybrane:
+        if i.lower()==x:
+            znajdujeSie=True
+    print(znajdujeSie)
+# print("Wybrane slowo to? ")
+a=input("Wybrane slowo to? ")
+if(wybrane.lower()==a.lower()):
+    print("Zgadles")
+else:
+    print("Niezgadles")
+
+# 4
+slowo = ["ala", "kot", "tomasz", "pies", "plot", "fotograf"]
+
+wybrane = slowo[(int)(random.uniform(0, len(slowo)))]
+print(wybrane)
+
+print(f"W slowie znajduje sie {len(wybrane)} liter")
+slowo = len(wybrane) * ["_"]
+
+# print(slowo[1])
+proba = 1
+while proba <= 11:
+    print(slowo)
+    znajdujeSie = False
+
+    x = input("Czy litera znajduje sie w slowie: ").lower()
+
+    for i in range(len(wybrane)):
+        if wybrane[i] == x:
+            znajdujeSie=True
+            if(wybrane[i]==x):
+                slowo[i]=x
+
+    if znajdujeSie:
+        print(f"Dobrze jest {x} w tym slowie")
+        print(f"Twoja {proba}")
+    if not znajdujeSie:
+        print(f"Nie ma  {x} w tym slowie")
+        print(f"Twoja {proba} proba")
+    if "_" not in slowo:
+        print(f"zgadles {slowo}")
+        break
+    proba += 1
+
+    # if(znajdujeSie):
+    #     slowo[0]=x
+    # print(slowo)
+    # pozycja+=1t
+# 5
+plansza = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']]
+# for j in plansza:
+#     print(j)
+wygrana=[
+    [(0,0), (0,1), (0,2)],
+    [(1,0), (1,1), (1,2)],
+    [(2,0), (2,1), (2,2)],
+    [(0,0), (1,0), (2,0)],
+    [(0,1), (1,1), (2,1)],
+    [(0,2), (1,2), (2,2)],
+    [(0,0), (1,1), (2,2)],
+    [(0,2), (1,1), (2,0)],
+]
+def znajdz_wolne_pola(plansza):
+    wolne = []
+    for i in range(3):
+        for j in range(3):
+            if plansza[i][j] not in ["x", "o"]:
+                wolne.append((i, j))
+    return wolne
+
+
+zaznaczone=[]
+zaznaczoneKomp = []
+
+czyWygrana=False;
+
+while not czyWygrana:
+    for j in plansza:
+        print(j)
+
+    x=input('Wprowadz pozycje: ')
+    for j in range(len(plansza)):
+        for i in range(len(plansza[j])):
+            if(plansza[j][i]==x):
+                plansza[j][i]='x'
+                zaznaczone.append((j,i))
+    for kom in wygrana:
+        if all(pole in zaznaczone for pole in kom):
+            print("wygrales")
+            czyWygrana=True
+    print(zaznaczone)          
+
+    wolne = znajdz_wolne_pola(plansza)
+    if wolne:
+        pole = random.choice(wolne)
+        poleInfo=plansza[pole[0]][pole[1]]
+        plansza[pole[0]][pole[1]] = "o"
+        zaznaczoneKomp.append(pole)
+        print(f"Komputer wybrał pole: {poleInfo}")
+
+        
+        for kom in wygrana:
+            if all(pole in zaznaczoneKomp for pole in kom):
+                for rzad in plansza:
+                    print(rzad)
+                print("Komputer wygrał!")
+                czyWygrana = True
+                break
+    else:
+        print("Remis!")
+        break
+
+# 6
+class Pojazd:
+    def __init__(self,maxPredkosc,aktualnaPredkosc):
+        self.maxPredkosc=maxPredkosc
+        self.aktualnaPredkosc=aktualnaPredkosc
+
+    def przyspiesz(self,predkosc):
+        self.aktualnaPredkosc+=predkosc
+
+    def zchamuj(self, predkosc):
+         roz=self.aktualnaPredkosc-predkosc
+         if roz>=0:
+             self.aktualnaPredkosc=roz
+         else:
+             print('Nie mozesz schamowac samochodu <0')
+
+class Samochod(Pojazd):             
+
+    def __init__(self, maxPredkosc, aktualnaPredkosc,wlaczoneSwiatla):
+        super().__init__(maxPredkosc, aktualnaPredkosc)
+        self.wlaczoneSwiatla = wlaczoneSwiatla
+
+    def wylaczWlaczSwiatla(self):
+        self.wlaczoneSwiatla = not self.wlaczoneSwiatla
+
+
+class Rower(Pojazd):
+
+    def __init__(self, maxPredkosc, aktualnaPredkosc,aktualnaPrzerzutka):
+        super().__init__(maxPredkosc, aktualnaPredkosc)
+        self.aktualnaPrzerzutka=aktualnaPrzerzutka
+        
+
+    def zmienPrzerzutke(self,przerzutka):
+        if przerzutka<=0 or przerzutka >6:
+            print("rower nie posiada takich przerzutek")
+        else:
+            self.aktualnaPrzerzutka=przerzutka
+
+
+poj=Pojazd(100,21)
+toyota=Samochod(100,2,True)
+print(toyota.wlaczoneSwiatla)
+toyota.wylaczWlaczSwiatla()
+print(toyota.wlaczoneSwiatla)
+toyota.wylaczWlaczSwiatla()
+print(toyota.wlaczoneSwiatla)
+
+kross=Rower(30,12,3)
+print(kross.przyspiesz(5))
+print(kross.aktualnaPredkosc)
+"""
+#7
+class Uzytkownik:
+    def __init__(self,login,haslo,email):
+        self.login=login
+        self.haslo=haslo
+        self.email=email
+        self.czyPoprawneHaslo()
+    
+    def czyPoprawneHaslo(self ):
+        if len(self.haslo)<7:
+            print("za krotkie haslo, zmien je")
+            x=input('Wprowadz nowe haslo')
+            self.zmianaHasla(x)
+
+    def zmianaHasla(self,haslo):
+        if len(haslo)>7:
+            self.haslo=haslo 
+            print("haslo zmienione")
+        else:
+            print("haslo nie zmienione")
+
+maciek=Uzytkownik('maciek123','maciek','@gmail.com')
+print(maciek.haslo)
