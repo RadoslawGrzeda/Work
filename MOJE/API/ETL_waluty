@@ -1,0 +1,38 @@
+import requests
+import pandas as pd 
+from sqlalchemy import create_engine,MetaData,table,text
+
+engine = create_engine("postgresql+psycopg2://postgres:qwerty1234@localhost:5432/postgres")
+
+#POBRANIE DANYCH Z API
+
+table ='A'
+url=f'https://api.nbp.pl/api/exchangerates/tables/{table}/?format=json'
+res=requests.get(url)
+result=res.json()
+data=result[0]['effectiveDate']
+rates=result[0]['rates']
+df_result=pd.DataFrame(rates)
+df_result['data']=data
+# df_result.to_csv('kursyWalut',index=False)
+#----------------------------------------
+# result=pd.read_csv('kursyWalut')
+# df=pd.DataFrame(result)
+# print(result)
+
+
+df = df_result.rename(columns={
+    'currency': 'nazwa',
+    'code': 'kod',
+    'mid': 'kurs',
+    'data': 'datagenerowania'
+})
+
+with engine.connect() as con:
+    res=con.execute(text('select max(datagenerowania) from kursyWalut'))
+    maxData=res.scalar()
+
+dataApi=df['datagenerowania'].unique()[0]
+
+if(str(dataApi)!=str(maxData)):
+    df.to_sql('kursywalut',con=engine,if_exists='append',index=False)
