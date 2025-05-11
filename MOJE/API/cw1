@@ -1,0 +1,47 @@
+
+import requests 
+# action="getAnimals"
+# action='insertAnimals'
+# url="http://localhost:5110/animals/insertAnimals"
+# res = requests.get(url)
+# print(res.status_code) 
+
+data={
+  "id": 3,
+  "name": "reks",
+  "category": "dog",
+  "weight": 122,
+  "coatColor": "brown"
+}
+# action='insertAnimals'
+# res=requests.post(url,json=data)
+# print(res.status_code)
+# print(res.text)
+
+print("-----------------------------------------------")
+# action="getAnimals"
+# action='insertAnimals'
+url="http://localhost:5110/animals/getAnimals"
+res = requests.get(url)
+print(res.status_code,res.json()) 
+
+print("-----------------------------------------------")
+res = requests.get("http://localhost:5110/animals/getAnimalById/2")
+print(res.status_code,res.json()) 
+
+print("-----------------------------------------------")
+res = requests.get("http://localhost:5110/animals/getAnimalByName/reks")
+print(res.status_code,res.json()) 
+
+print("-----------------------------------------------")
+res=requests.delete("http://localhost:5110/animals/deleteAnimal/3")
+res = requests.get("http://localhost:5110/animals/getAnimals")
+print(res.json()) 
+
+print("-----------------------------------------------")
+
+url="http://localhost:5110/animals/updateAnimal?id=2"
+res=requests.put(url,json=data)
+res = requests.get("http://localhost:5110/animals/getAnimals")
+print(res.json()) 
+

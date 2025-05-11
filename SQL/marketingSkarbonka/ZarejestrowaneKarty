@@ -1,0 +1,69 @@
+with klient as (
+  select 
+  distinct 
+    lt.person_id as personId,
+    identifier_id as nrKarty,
+    last_modified_date as dataMod
+  from   
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  join 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.user` us 
+  on
+     lt.person_id=us.person_id
+  where
+     loyalty_status='LOS_01' 
+  and
+     is_deleted=false
+  -- and identifier_id='0450025690777'
+)
+,dataSub as (
+  SELECT
+   account_IdentifierNo,
+   recognition_startDate as dataMod
+  FROM
+    `auchan-pol-prod.raw_comarch.loya_status` ls 
+  where
+     recognition_startDate in 
+                (select 
+                    min(recognition_startDate) 
+                from 
+                    `auchan-pol-prod.raw_comarch.loya_status` ls2 
+                where 
+                    ls.account_IdentifierNo=ls2.account_IdentifierNo )
+ 
+)
+,minSFC as 
+(
+    SELECT
+      identifier_id,
+      last_modified_date as dataOstMod
+    FROM 
+      `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty_histo` lh1 
+    where 
+       last_modified_date in 
+                (select 
+                    min(last_modified_date)
+                 from 
+                    `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty_histo` lh2
+                 where 
+                    lh1.identifier_id=lh2.identifier_id)
+    and
+     loyalty_status='LOS_01'
+)
+select 
+-- k.*,d.dataMod as CLMDATE ,minSFC.dataOstMod as SFCDATE   
+distinct 
+  personId
+from
+  klient k
+join
+  dataSub d on k.nrKarty=d.account_IdentifierNo 
+left join 
+  minSFC 
+on
+  k.nrKarty=minSFC.identifier_id
+where
+  d.dataMod<'2025-04-21'
+and 
+  minSFC.dataOstMod<'2025-04-21'
+-- where personId='001Sa00000s00DrIAI'

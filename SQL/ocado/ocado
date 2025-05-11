@@ -76,8 +76,10 @@ CREATE TEMP TABLE tmp_send_log AS WITH komunikacja AS (
     ac.person_id_sf
   FROM
     `auchan-pol-prod.raw_salesforce_customeractivation_sec.email_send_log` sl
-    JOIN `auchan-pol-prod.raw_salesforce_customeractivation_sec.cco_campaign_messages` dict_camp ON dict_camp.msg_id = sl.messageid
-    LEFT JOIN `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac ON ac.person_id = sl.countrycustomerid
+    JOIN 
+    `auchan-pol-prod.raw_salesforce_customeractivation_sec.cco_campaign_messages` dict_camp ON dict_camp.msg_id = sl.messageid
+  LEFT JOIN 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac ON ac.person_id = sl.countrycustomerid
   WHERE
     DATE(sl.tech_date) >= v_data_korekta
     AND msg_code = v_message_code

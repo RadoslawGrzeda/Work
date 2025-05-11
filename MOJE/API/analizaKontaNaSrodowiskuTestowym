@@ -1,0 +1,52 @@
+import requests
+import json
+client_id=''
+client_secret=''
+GraviteeKeyAut= ""
+GraviteeKeyGet= ""
+url='https://api.ari.np.auchan.com/pl/customer/v1/crm/oauth2/token'
+
+params = {
+    'grant_type': 'client_credentials',
+    'client_id': client_id,
+    'client_secret': client_secret
+    
+}
+
+headers = {
+    'X-Gravitee-Api-Key': GraviteeKeyAut,
+    'Content-Type': 'application/json',
+    'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1'
+}
+
+response = requests.post(url,params=params, headers=headers)
+
+
+if response.status_code == 200:
+    access_token = response.json().get('access_token')
+    print("Access token:", access_token)
+else:
+    print("Błąd pobierania tokenu:", response.status_code, response.text)
+    exit()
+
+customer='001KIBZzyKYAT'
+url=f'https://api.ari.np.auchan.com/pl/customer/v1/customers/{customer}'
+
+
+headers = {
+    'X-Gravitee-Api-Key': GraviteeKeyGet,
+    'Authorization': f'Bearer {access_token}',
+    'Content-Type': 'application/json',
+    'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1'
+}
+
+params = {
+    'grant_type': 'client_credentials',
+    'client_id': client_id,
+    'client_secret': client_secret,
+    'filters': 'channels'
+}
+
+
+res=requests.get(url,params=params,headers=headers)
+print(json.dumps(res.json(), indent=4, ensure_ascii=False))

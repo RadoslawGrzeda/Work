@@ -215,4 +215,3 @@ class Uzytkownik:
 
 maciek=Uzytkownik('maciek123','maciek','@gmail.com')
 print(maciek.haslo)
-
