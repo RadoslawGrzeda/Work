@@ -55,7 +55,4 @@ while proba<11:
           if x==i:
                znajdujeSie=True;
                pozycja=len(i)
-     if(znajdujeSie):
-          
-     
     
