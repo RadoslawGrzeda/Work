@@ -1,0 +1,209 @@
+import requests 
+import json
+#CONNECT
+gravityConnect=''
+gravityGet=''
+gravityPost=''
+client_id=''
+client_secret=''
+
+url='https://api-private-yoda.ari.internal.auchan.com/pl/customer-diamond/v1/crm/oauth2/token'
+
+header={
+    'X-Gravitee-Api-Key':gravityConnect,
+    'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1',
+    'Content-Type':'application/json',
+    "Content-Type": "application/x-www-form-urlencoded"
+}
+params={
+    'grant_type':'client_credentials',
+    'client_id':client_id,
+    'client_secret':client_secret
+
+}
+try:
+    request=requests.post(url,params=params,headers=header,verify=False)
+
+    if request.status_code==200:
+        klucz=request.json().get('access_token')
+        print(request.text)
+        print('klucz: ', klucz)
+    else:
+        print('Nie dziala',request.status_code)
+except Exception as e:
+    print('problem z polaczeniem do url', e)
+
+
+#GET
+# customer='0017S00000FNj55QAD'
+# customer='0011t00000jAupqAAC'
+#KontoTestowe
+customer='001Sa00000wejuhIAA'
+
+# customer='8799665225732'
+# urlGET=f'https://api-private-yoda.ari.internal.auchan.com/pl/customer-diamond/v1/customers/{customer}'
+urlGET=f'https://api-private-yoda.ari.internal.auchan.com/pl/customer-diamond/v1/customers/{customer}/channels'
+prams2={
+    'grant_type': 'client_credentials',
+    'client_id':client_id,
+    'client_secret': client_secret,
+    'filters':'channels'
+}
+header2={
+    'X-Gravitee-Api-Key':gravityGet,
+    'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1',
+    'Content-Type':'application/json',
+    # "Content-Type": "application/x-www-form-urlencoded",
+    'Authorization':f'Bearer {klucz}'
+}
+try:
+    request2=requests.get(urlGET,params=prams2,headers=header2,verify=False)
+
+    if request2.status_code==200:
+        print('zejebisie')
+        data=request2.json()
+        data=json.dumps(data,indent=4)
+        # data=json.dumps(request2.json(),indent=4).get['subscriptions']
+        print(data)
+    else:
+        print('Cos nie tak',request2.status_code)
+except Exception as e:
+    print('Problem przy pobraniu danych', e)
+# print(data)
+# # print (data )
+# for row in data:
+#     for i in row:
+#         if row[i]=='CHANNEL_EMAIL':
+#             if i=='optin':
+                # print(row[i])
+            # print(row[i]['type'])
+            # row[i]['isOptin']=True if row[i]['type']=='CHANNEL_EMAIL'
+            # print(row[i]['isOptin'])
+# print(data)       
+# data=data[0]    
+            # for x in i:
+            # print(x)
+        # if i=='optin':
+        # print(i)
+# print(data['optin'])
+# print(data['optin'])
+##post isoptin
+# customer='001Sa00000wejuhIAA'
+
+# urlPOST=f'https://api-private-yoda.ari.internal.auchan.com/pl/customer-diamond/v1/customers/{customer}/channels'
+
+# prams3={
+#     'grant_type': 'client_credentials',
+#     'client_id':client_id,
+#     'client_secret': client_secret,
+#     'filters':'channels'
+# }
+# header3={
+#     'X-Gravitee-Api-Key':gravityPost,
+#     'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1',
+#     'Content-Type':'application/json',
+#     # "Content-Type": "application/x-www-form-urlencoded",
+#     'Authorization':f'Bearer {klucz}'
+# }
+
+
+
+# try:
+#     request3=requests.post(urlPOST,json=data,params=prams3,headers=header3,verify=False)
+
+#     if request3.status_code==201 or request3.status_code==200:
+#         print('zejebisie')
+#         data=json.dumps(request3.json(),indent=4)
+#         print(data)
+#     else:
+#         print(request3.status_code)
+#         print('Status 200 ale chujnia przy get')
+# except Exception as e:
+#     print('Problem przy pobraniu danych', e)
+'''
+urlGET=f'https://api-private-yoda.ari.internal.auchan.com/pl/customer-diamond/v1/customers/{customer}/attributes'
+prams2={
+    'grant_type': 'client_credentials',
+    'client_id':client_id,
+    'client_secret': client_secret,
+    'filters':'channels'
+}
+header2={
+    'X-Gravitee-Api-Key':gravityGet,
+    'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1',
+    'Content-Type':'application/json',
+    # "Content-Type": "application/x-www-form-urlencoded",
+    'Authorization':f'Bearer {klucz}'
+}
+try:
+    request2=requests.get(urlGET,params=prams2,headers=header2,verify=False)
+
+    if request2.status_code==200:
+        data=request2.json()
+        # data=json.dumps(request2.json(),indent=4).get['subscriptions']
+        print(data)
+    else:
+        print('Cos nie tak')
+except Exception as e:
+    print('Problem przy pobraniu danych', e)
+    
+# data=json.dumps(data,indent=4)
+# print(data)
+
+for sub in data['subscriptions']:
+    if sub["type"]=="SUBSCRIPTION_TYPE_EMAIL_AUCHAN_DIRECT":
+         sub["valueCode"] = "SUBSCRIPTION_VALUE_SUBSCRIBED"
+# data=json.dumps(data,indent=4)
+# print(data)
+
+#POST 
+# data=json.dumps(data,indent=4)
+# print(data)
+
+# customer='001Sa00000wejuhIAA'
+
+urlPOST=f'https://api-private-yoda.ari.internal.auchan.com/pl/customer-diamond/v1/customers/{customer}/attributes'
+
+prams3={
+    'grant_type': 'client_credentials',
+    'client_id':client_id,
+    'client_secret': client_secret,
+    'filters':'channels'
+}
+header3={
+    'X-Gravitee-Api-Key':gravityPost,
+    'Cookie': 'CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1',
+    'Content-Type':'application/json',
+    # "Content-Type": "application/x-www-form-urlencoded",
+    'Authorization':f'Bearer {klucz}'
+
+dane={
+     "subscriptions": [
+    {
+       "valueCode": "SUBSCRIPTION_VALUE_SUBSCRIBED"
+       
+    }
+  ]
+
+     
+    #   {
+    #         "id": "a0wSa0000024HpAIAU",
+    #         "lastModificationDate": "2025-05-13T09:44:03.000Z",
+    #         "type": "SUBSCRIPTION_TYPE_EMAIL_AUCHAN_DIRECT",
+    #         "valueCode": "SUBSCRIPTION_VALUE_SUBSCRIBED"
+    #     },
+    
+}
+
+try:
+    request2=requests.post(urlPOST,json=data,params=prams3,headers=header3,verify=False)
+
+    if request2.status_code==201 or request2.status_code==200:
+        data=json.dumps(request2.json(),indent=4)
+        print(data)
+    else:
+        print(request2.status_code)
+        print('Cos nie tak')
+except Exception as e:
+    print('Problem przy pobraniu danych', e)
+'''
