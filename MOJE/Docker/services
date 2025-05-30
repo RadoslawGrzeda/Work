@@ -1,0 +1,23 @@
+services:
+    postgres:
+        image: postgres
+        environment:
+        POSTGRES_USER:
+        POSTGRES_PASSWORD:
+        POSTGRES_DB:
+    volumes:
+        -postgres-db-volume:/var/lib/postgressql/data
+    healthcheck:
+        test:["CMD","pg_isready","-U","airflow"]
+        interval: 5s
+        retries: 5
+    restart always
+docker run -it \
+  -e POSTGRES_USER=root \
+  -e POSTGRES_PASSWORD=root \
+  -e POSTGRES_DB=postgres \
+  -v /c/Users/Radosław/desktop/Work/moje/docker/postgres_data:/var/lib/postgresql/data \
+  -p 5433:5432 \
+  postgres:13
+
+https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page

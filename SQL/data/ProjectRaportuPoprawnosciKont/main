@@ -1,0 +1,135 @@
+CREATE TEMP FUNCTION isActive (person_id STRING )
+RETURNS BOOL
+LANGUAGE js 
+ AS 
+  r'''
+  zmienna=person_id == null || person_id =='x' ? false : true
+  return zmienna
+  ''';
+with 
+  lastIter as (
+  select
+    SUBSTR (person_unique_code,7) as person_id,
+    last_interaction
+  from
+    `auchan-pol-prod.bl_customer_interactions.last_customer_interactions`
+
+)
+,da as (
+  select 
+    person_id as person_id_DA,
+    email_user as email,
+    portal_user_confirmation_date,
+    -- if(portal_user_confirmation_date is not null,'potwierdzony','niepotwierdzony') as potwierdzonyMail,
+    created_date,
+    portal_user_confirmation_date as ConfirmationDA
+
+  from
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.user` su
+)
+,channel as (
+  select 
+    ch.person_id,
+    ch.value as mail,
+    ch.optin_channel as OptinMail,
+    ch.flag_main_type as MainMail,
+    chn2.value as telefon,
+    chn2.optin_channel OptinTelefon,
+    chn2.flag_main_type as MainTelefon
+  from 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch
+  left join 
+  ( select 
+    person_id,
+    value,
+    ch.optin_channel,
+    ch.flag_main_type
+  from 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch
+  -- where channel_type='CHT_06'
+  where value like '+%'
+  ) chn2
+  on ch.person_id=chn2.person_id
+  where channel_type='CHT_04'
+
+
+)
+,karty as (
+  select 
+    person_id,
+    identifier_id as karta,
+    loyalty_status as status
+  from
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty`
+)
+,seniorKdr
+as (
+   SELECT 
+  s.person_id,
+  'SENIOR' as TypKlienta,
+  cast(date_of_subscription as date) as DataSubskrypcji ,
+  case when flag_actif=true then 'AKTYWNY' else 'NIEAKTYWNY' end as Status,
+  case when flag_actif=false then cast(date_of_unsubscription as date) end as DataUnSubskrypcji
+ FROM
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.community_member` s
+  where community_code='COM_06' 
+ 
+
+  UNION ALL
+
+   SELECT 
+  kdr.person_id,
+  'KDR' as TypKlienta,
+  cast(date_of_subscription as date) as DataSubskrypcji ,
+  case when flag_actif=true then 'AKTYWNY' else 'NIEAKTYWNY' end as Status,
+  case when flag_actif=false then cast (date_of_unsubscription as date) end as DataUnSubskrypcji
+ FROM
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.community_member` kdr
+  where community_code='COM_03'
+  ) 
+
+
+-- ,agr as (
+select 
+  ac.person_id,
+  birth_date,
+  person_id_sf,
+  -- isActive(person_id_sf),
+  --------------------
+  --channel
+  mail,
+  ch.OptinMail,
+  ch.MainMail,
+  telefon,
+  ch.MainTelefon,
+  ch.OptinTelefon,
+  --------------------
+  --karty
+  k.karta,
+  k.status,
+  --------------------
+  --da
+  case when person_id_DA is null then 'BezKontaCyfrowego' else 'ZKontemCyfrowym' end as czyDA,
+  created_date as createDa,
+  ConfirmationDA
+  ------------
+
+from 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac
+left join
+    channel ch
+on
+   ac.person_id=ch.person_id
+left join 
+  lastIter lt
+on
+  lt.person_id=ac.person_id
+left join
+  da d
+on 
+  d.person_id_DA=ac.person_id   
+and 
+  d.email=ch.mail
+left join 
+  karty k 
+on k.person_id =ac.person_id
