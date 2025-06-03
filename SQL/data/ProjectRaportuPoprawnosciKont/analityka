@@ -1,0 +1,37 @@
+-- ilość kont z przedrostkiem email usun1_ usun2_ usun_ usun3_ jako główny	może być z capslockiem lub normalnie, lub różną czcionką (cyfra)
+select 
+distinct 
+person_id,
+mail
+from 
+`pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main`
+where lower(mail) like 'usun%' or lower(mail) like '%usun'
+
+-- ilość kont bez aktywności > 3 lata	photo dzienne (last interaction query) 
+select
+ person_id,
+ last_interaction
+from 
+`pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main`
+
+-- ilość założonych kont klienta	per źródło konta (cyfra)
+
+-- ilość kont z potwierdzonym DA	cyfra
+
+-- ilość kont z niepotwierdzonych DA	Ilość powyżej 72 godziny (cyfra) + ilości miesięczne
+
+-- ilość uniklanych adresów email które występują na >1 koncie jako main	cyfra
+
+-- ilość kont z multi-emailami	minimum 2 kanały email na koncie (cyfra)
+
+-- ilość kont z multi-telefonami	minimum 2 kanały telefon na koncie (cyfra)
+
+-- ilość kont z >1 aktywnymi kartami skarbonka	minimum 2 karty Skarbonka na koncie (statusy LOS_01, LOS_06)
+	
+-- ilość klientów których nie ma w SF a jest w Ocado	cyfra
+	
+-- brak optin dla kanału email main na koncie ale zgoda na newslettery	brak optin blokuje wysyłkę wiadomości handlowych
+	
+-- status KDR bez wpisanego numeru karty KDR	COM_03 FAMILY & other_id_number (cyfra)
+
+-- status senior nieodpowiadający wiekowi w profilu	data urodzenia < 60 lat   (cyfra)
