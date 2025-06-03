@@ -104,6 +104,7 @@ select
   birth_date,
   ac.person_id_sf,
   --------------------
+  lI.last_interaction,
   --channel
   mail,
   ch.OptinMail,
@@ -156,6 +157,8 @@ left join senior s
 on s.person_id=ac.person_id
 left join ocado o  
 on o.person_id_sf=ac.person_id_sf
+left join lastIter lI on 
+lI.person_id=ac.person_id
 )
 select 
 *
