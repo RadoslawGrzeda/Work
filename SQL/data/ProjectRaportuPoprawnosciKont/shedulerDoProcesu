@@ -1,9 +1,11 @@
 DECLARE v_date DATE;
 SET v_date=CURRENT_DATE();
-CREATE OR REPLACE TABLE pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main 
-partition by 
-DataGenerowania
-as (
+
+--Celem skryptu jest przygotowanie tabeli faktów, tabeli Main w zbiorze WalidacjaAnomaliSFC. Tabela służy do zebrania wszystkich niezbędnych elementów określonych 
+-- w wymaganiach zadania aby poźniej móc wykonać na niej szereg zapytan już stricte analitycznych.
+-- Do tabeli wstawiamy tylko elementu których jeszcze w niej nie ma, czyli rekordy które róznią się przynajmniej wartościa jednego pola.
+
+INSERT INTO `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main` (
 with 
   lastIter as (
   select
@@ -95,7 +97,7 @@ with
 )
 
 
-
+,agr as (
 select 
   v_date as DataGenerowania,
   ac.person_id,
@@ -158,4 +160,10 @@ on o.person_id_sf=ac.person_id_sf
 left join lastIter lI on 
 lI.person_id=ac.person_id
 )
--- where creation_application ='ZAKUPY'
+select 
+*
+from agr
+except distinct 
+select * from 
+`pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main`
+)
