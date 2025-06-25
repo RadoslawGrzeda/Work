@@ -1,0 +1,42 @@
+DECLARE v_dataStart,v_dataEnd DATE;
+DECLARE v_site, v_kto STRING;
+
+SET v_dataStart='2025-01-01';
+SET v_dataEnd=current_date();
+SET v_site='PL_00664_MAG';
+SET v_kto='SENIOR'; -- SENIOR LUB KDR
+
+
+with senior
+   as (
+  SELECT
+    pr.person_id,
+    lt.identifier_id
+  FROM `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` pr
+  join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+  on pr.person_id=lt.person_id
+  where
+    TypKlienta=v_kto
+    and status='AKTYWNY'
+),
+zakupy as (
+  SELECT
+      identifierNo,
+      date,
+      locationCode
+  FROM
+     `auchan-pol-prod.raw_comarch.trans_trn`
+  Where locationCode = v_site
+  and date between v_dataStart and v_dataEnd
+)
+
+select 
+  distinct
+  person_id,
+  s.identifier_id as karta
+from 
+  senior s 
+join
+  zakupy z 
+on
+  s.identifier_id=z.identifierNo

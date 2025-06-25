@@ -1,0 +1,81 @@
+declare v_curr DATE;
+SET v_curr=current_date();
+CREATE TEMP FUNCTION check72DA(currentDate DATE,creDate date,confirmationDa DATE)
+RETURNS STRING AS (
+  if( date_diff(currentDate,creDate,day)<=3 and confirmationDa is null,'NOT_CONFIRMED','' )
+);
+
+CREATE TEMP FUNCTION check272DA(currentDate DATE,creDate date,confirmationDa DATE)
+RETURNS STRING AS (
+  if( date_diff(currentDate,creDate,day)>3 and confirmationDa is null,'ERROR','' )
+);
+
+INSERT INTO `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.zalozyliDa` (
+ with agr as (
+ select 
+     date(created_date) as creDate,
+    person_id as person_id,
+    email_user as email,
+    created_date,
+    portal_user_confirmation_date as ConfirmationDA,
+    'CONFIRM' as status
+  from
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.user` su
+where portal_user_confirmation_date is not null 
+and date(created_date)<>'1900-01-01'
+
+UNION ALL 
+
+select 
+     date(created_date) as creDate,
+    person_id as person_id,
+    email_user as email,
+    created_date,
+    portal_user_confirmation_date as ConfirmationDA,
+    check72DA(v_curr,date(created_date),date(portal_user_confirmation_date)) as status
+  from
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.user` su
+where portal_user_confirmation_date is null 
+and check72DA(v_curr,date(created_date),date(portal_user_confirmation_date))='NOT_CONFIRMED'
+ )
+select 
+* from
+agr where 
+creDate=v_curr-1
+
+);
+
+INSERT INTO `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.miesiecznie_NiepotwierdzoneDA`
+(
+with agr as (
+ select 
+    extract (year from created_date) as rok,
+    extract (month from created_date) as miesiac,
+    su.person_id as person_id,
+    email_user as email,
+    created_date,
+    portal_user_confirmation_date as ConfirmationDA,
+    check272DA(v_curr,date(created_date),date(portal_user_confirmation_date)) as status
+  from
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.user` su
+    join 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+  on su.person_id=ac.person_id
+where portal_user_confirmation_date is null 
+and ac.creation_application in ('ZAKUPY','CIAM')
+and check272DA(v_curr,date(created_date),date(portal_user_confirmation_date))  ='ERROR'
+)
+select 
+rok,
+miesiac,
+person_id,
+email,
+created_date,
+ConfirmationDA,
+status
+from agr a
+where not EXISTS 
+(select 1 from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.miesiecznie_NiepotwierdzoneDA` n
+where a.person_id=n.person_id and n.email=a.email and a.created_date=n.created_date
+)
+)

@@ -1,0 +1,229 @@
+DECLARE v_data3 DATE;
+DECLARE v_curr DATE;
+DECLARE currData STRING;
+
+SET v_data3=date_sub(current_date(),interval 3 year);
+SET v_curr=current_date();
+SET currData=cast(v_curr as STRING);
+-- SET v_curr=cast(v_curr as String);
+CREATE TEMP FUNCTION czySenior(currentDate STRING,dateOfBirt STRING)
+returns BOOL
+LANGUAGE js
+ as
+r'''
+    const v_cur=currentDate.split('-')
+    const last=dateOfBirt.split('-')
+    if((v_cur[0]-last[0])>60){
+        return true;
+      }
+    else if(((v_cur[0]-last[0])==60)&& (v_cur[1]>=last[1]) && (v_cur[2]>=last[2])){
+        return true;
+        }
+        else {
+    return false;
+}
+''';
+-- ilość kont z przedrostkiem email usun1_ usun2_ usun_ usun3_ jako główny
+-- CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Anomalie` as ( 
+  CREATE TEMP TABLE test as (
+
+with mail as (
+  select 
+distinct 
+lower(mail) as mail,
+count(distinct person_id),
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where mail is not null
+and MainMail=true
+group by 1 
+having count(distinct person_id)>1
+)
+,konto as (
+  select 
+distinct 
+person_id,
+count(distinct mail)
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where mail is not null
+group by 1 
+having count(distinct mail)>1
+)
+
+,konto2 as (  
+select 
+distinct 
+person_id,
+channelTypeTelefon,
+count(distinct telefon)
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where mail is not null
+group by 1,2
+having count(distinct telefon)>1
+)
+,skarbonka as (  
+  select 
+distinct 
+person_id,
+count(distinct karta)
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where karta is not null 
+and status ='LOS_01'
+group by 1 
+having count(distinct karta)>1
+)
+,czySenior as (
+  select 
+person_id,
+SENIOR,
+birth_date,
+czySenior(currData,cast(birth_date as string)) czyJestSenior
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where SENIOR='AKTYWNY'
+and status='LOS_01'
+and birth_date is not null 
+)
+
+,agr as(
+  select 
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_USUN' as anomalia,
+person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where lower(mail) like 'usun%' or lower(mail) like '%usun'
+and MainMail=true
+
+
+-- ilość kont bez aktywności > 3 lata
+UNION ALL
+
+select 
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_BEZ_AKTYWNOSCI_>3' as anomalia,
+person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where last_interaction<v_data3
+
+
+-- ilość założonych kont klienta --> oddzielny proces
+
+-- ilość kont z potwierdzonym DA --> oddzielny proces
+
+-- ilość kont z niepotwierdzonych DA --> oddzielny proces
+
+
+-- ilość uniklanych adresów email które występują na >1 koncie jako main
+
+UNION ALL
+
+select 
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_>1_MAIN_EMAIL' as anomalia,
+person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE` main
+join mail ma on lower(main.mail)=ma.mail
+
+
+-- ilość kont z multi-emailami
+UNION ALL
+
+select 
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_MULTI_EMAIL' as anomalia,
+a.person_id as person_id,
+'AKTUALNE' as status
+
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE` a
+join konto k on a.person_id=k.person_id
+
+-- join mail ma on lower(main.mail)=ma.mail
+-- order by 2
+-- ilość kont z multi-telefonami
+UNION ALL
+
+select 
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_MULTI_TELEFON' as anomalia,
+a.person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE` a
+join konto2 k on a.person_id=k.person_id
+
+-- ilość kont z >1 aktywnymi kartami skarbonka
+UNION ALL 
+
+select 
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_>1_AKTYWNA_SKARBONKA' as anomalia,
+a.person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE` a
+join skarbonka k on a.person_id=k.person_id
+
+-- ilość klientów których nie ma w SF a jest w Ocado
+UNION ALL
+
+select
+distinct
+v_curr-1 as dataGenerowania,
+'ANOMALIA_NIE MA W SFC_A JEST W OCADO' as anomalia,
+person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where sprawa='NOT_OK'
+
+
+-- brak optin dla kanału email main na koncie ale zgoda na newslettery
+
+-- status KDR bez wpisanego numeru karty KDR
+UNION ALL
+
+select 
+distinct 
+v_curr-1 as dataGenerowania,
+'ANOMALIA_KDR_BEZ_NUMERU_KARTY' as anomalia,
+person_id as person_id,
+'AKTUALNE' as status
+from `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE`
+where KDR='AKTYWNY'
+and status='LOS_01'
+and nrKartKDR is null 
+
+-- status senior nieodpowiadający wiekowi w profilu
+UNION ALL
+select 
+v_curr-1 as dataGenerowania,
+'ANOMALIA_SENIOR_Z_NIEPOPRWANYM_WIEKIEM' as anomalia,
+person_id as person_id,
+'AKTUALNE' as status
+from czySenior 
+where czyJestSenior=false
+)
+select * from agr 
+  );
+
+MERGE `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Anomalie` AS a
+USING (
+  SELECT * FROM `test` 
+) AS t
+ON a.anomalia = t.anomalia AND a.person_id = t.person_id
+WHEN NOT MATCHED BY SOURCE THEN
+  UPDATE SET a.status = 'NIEAKTUALNE';
+
+MERGE `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Anomalie` as a
+USING (
+  SELECT anomalia,person_id,status
+  from test where status='AKTUALNE'
+) as t 
+ON t.anomalia=a.anomalia and t.person_id=a.person_id and a.status=t.status
+WHEN NOT MATCHED THEN 
+INSERT (dataGenerowania, anomalia, person_id, status)
+VALUES (v_curr-1, t.anomalia, t.person_id, t.status)

@@ -1,9 +1,8 @@
 DECLARE v_date DATE;
 SET v_date=CURRENT_DATE();
-CREATE OR REPLACE TABLE pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main 
-partition by 
-DataGenerowania
-as (
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.AKTUALNIE` 
+  as (
 with 
   lastIter as (
   select
@@ -31,7 +30,9 @@ with
     ch.flag_main_type as MainMail,
     chn2.value as telefon,
     chn2.optin_channel OptinTelefon,
-    chn2.flag_main_type as MainTelefon
+    chn2.flag_main_type as MainTelefon,
+    ch.channel_type as channelTypeMail,
+    chn2.channel_type as channelTypeTelefon
   from 
     `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch
   left join 
@@ -39,13 +40,15 @@ with
     person_id,
     value,
     ch.optin_channel,
-    ch.flag_main_type
+    ch.flag_main_type,
+    ch.channel_type
   from 
     `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch
   where value like '+%'
+
   ) chn2
   on ch.person_id=chn2.person_id
-  where channel_type='CHT_04'
+  where ch.channel_type='CHT_04'
 
 
 )
@@ -95,9 +98,9 @@ with
 )
 
 
-
+,agr as (
 select 
-  v_date as DataGenerowania,
+  -- v_date as DataGenerowania,
   ac.person_id,
   birth_date,
   ac.person_id_sf,
@@ -110,6 +113,8 @@ select
   telefon,
   ch.MainTelefon,
   ch.OptinTelefon,
+   ch.channelTypeMail,
+    ch.channelTypeTelefon,
   --------------------
   --karty
   k.karta,
@@ -155,7 +160,147 @@ left join senior s
 on s.person_id=ac.person_id
 left join ocado o  
 on o.person_id_sf=ac.person_id_sf
+or o.person_id_sf=ac.person_id
 left join lastIter lI on 
 lI.person_id=ac.person_id
 )
--- where creation_application ='ZAKUPY'
+select
+ *
+from agr
+
+)
+-- )
+-- ,porownanie as (
+-- select 
+--   person_id,
+--   birth_date,
+--   person_id_sf,
+--   mail,
+--   OptinMail,
+--   MainMail,
+--   telefon,
+--   MainTelefon,
+--   OptinTelefon,
+--   karta,
+--   status,
+--   czyDA,
+--    createDa,
+--   ConfirmationDA,
+--    KDR,
+--    nrKartKDR, 
+--    SENIOR,
+--   sprawa,
+--   registration_date,
+--   creation_application
+-- from agr
+-- except distinct 
+-- select 
+-- person_id,
+-- birth_date,
+-- person_id_sf,
+-- mail	,
+-- OptinMail,	
+-- MainMail	,
+-- telefon	,
+-- MainTelefon,	
+-- OptinTelefon	,
+-- karta		,
+-- status	,
+-- czyDA		,
+-- createDa	,
+-- ConfirmationDA,			
+-- KDR,
+-- nrKartKDR	,
+-- SENIOR	,
+-- sprawa	,
+-- registration_date,	
+-- creation_application
+-- from 
+-- `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main`
+-- )
+-- select 
+-- v_date,
+-- p.person_id,
+--   birth_date,
+--   person_id_sf,
+-- last_interaction,
+--   mail,
+--   OptinMail,
+--   MainMail,
+--   telefon,
+--   MainTelefon,
+--   OptinTelefon,
+--   karta,
+--   status,
+--   czyDA,
+--    createDa,
+--   ConfirmationDA,
+--    KDR,
+--    nrKartKDR, 
+--    SENIOR,
+--   sprawa,
+--   registration_date,
+--   creation_application
+--  from porownanie as p 
+-- left join lastIter lI 
+-- on lI.person_id=p.person_id
+-- )
+-- -- ,zmianaKonta as (
+-- --   select  
+-- -- person_id,
+-- -- birth_date,
+-- -- person_id_sf,
+-- -- last_interaction,	
+-- -- mail	,
+-- -- OptinMail,	
+-- -- MainMail	,
+-- -- telefon	,
+-- -- MainTelefon,	
+-- -- OptinTelefon	,
+-- -- karta		,
+-- -- status	,
+-- -- czyDA		,
+-- -- createDa	,
+-- -- ConfirmationDA,			
+-- -- KDR,
+-- -- nrKartKDR	,
+-- -- SENIOR	,
+-- -- sprawa	,
+-- -- registration_date,	
+-- -- creation_application
+-- --     from 
+-- -- `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main`
+-- -- except distinct 
+-- -- select * from agr
+-- -- )
+
+
+-- -- ,zmianaKonta as (
+-- --   select  
+-- -- person_id,
+-- -- birth_date,
+-- -- person_id_sf,
+-- -- last_interaction,	
+-- -- mail	,
+-- -- OptinMail,	
+-- -- MainMail	,
+-- -- telefon	,
+-- -- MainTelefon,	
+-- -- OptinTelefon	,
+-- -- karta		,
+-- -- status	,
+-- -- czyDA		,
+-- -- createDa	,
+-- -- ConfirmationDA,			
+-- -- KDR,
+-- -- nrKartKDR	,
+-- -- SENIOR	,
+-- -- sprawa	,
+-- -- registration_date,	
+-- -- creation_application
+-- --     from 
+-- -- `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.Main`
+-- -- except distinct 
+-- -- select * from agr
+-- -- )
+

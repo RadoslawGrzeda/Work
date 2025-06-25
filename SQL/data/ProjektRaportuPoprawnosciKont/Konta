@@ -1,0 +1,14 @@
+DECLARE v_data DATE;
+set v_data=current_date()-1;
+
+
+INSERT INTO `pol-it-digiteam-2022062900.WalidacjaAnomaliSFC.zalozoneKonta`  (
+SELECT 
+  date(registration_date) as dataRejestracji,
+  person_id,
+  person_id_sf,
+  registration_date,
+  creation_application
+ FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact`
+ where date(registration_date)=v_data
+)
