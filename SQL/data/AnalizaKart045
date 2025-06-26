@@ -1,4 +1,4 @@
-with konta as  test
+with konta 
 (
 SELECT 
   ch.person_id,
