@@ -1,4 +1,4 @@
-with konta branch2
+with konta 
 (
 SELECT 
   ch.person_id,
