@@ -1,0 +1,100 @@
+UPDATE `pol-it-digiteam-2022062900.DATA_SHARING.ocado_reaktywacja`
+SET upd_date = current_date(),
+    status = 'PENDING'
+WHERE status = 'CREATED'
+;
+
+UPDATE `pol-it-digiteam-2022062900.DATA_SHARING.ocado_reaktywacja`
+SET upd_date = current_date(),
+    status = 'CREATED'
+WHERE status = 'REKLAMACJA'
+;
+
+
+UPDATE `pol-it-digiteam-2022062900.DATA_SHARING.ocado_reaktywacja`
+SET upd_date = current_date(),
+    status = 'REMOVED'
+WHERE status = 'DELETED'
+;
+
+CREATE TEMP TABLE tmp_lst_trn AS 
+WITH transactions AS 
+(
+  SELECT DISTINCT 
+      ac.person_id
+      , ac.person_id_sf
+      , MAX(th.TrnDate) AS last_trn
+  FROM
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th     
+  JOIN 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+    ON th.TrnLoyaltyAccountId = ac.person_id_sf
+  WHERE
+  th.TrnDate >= '2024-03-16'
+  AND (TrnActivityId like 'ecom_%' or TrnActivityId like 'ocado_%')
+  AND ac.is_deleted = false
+  AND ac.person_status = 'ACS_02'
+  AND th.TrnType = 'SPRZEDAZ FISKALNA'
+  --AND ac.person_id = '8826802339844'
+  GROUP BY 1, 2
+)
+SELECT DISTINCT
+  current_date() AS cre_date
+  , t.person_id
+  , t.person_id_sf
+  , t.last_trn
+  --, DATE_DIFF(current_date(), t.last_trn, DAY)
+  , NULL AS status  
+FROM 
+  transactions t
+JOIN
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.user` u
+  ON u.person_id = t.person_id
+WHERE
+  u.is_active = true
+  AND u.to_anonymize = false
+  AND t.last_trn < current_date() - 60
+ORDER BY 4 DESC
+;
+
+CREATE TEMP TABLE tmp_wykorzystany_kupon AS
+SELECT DISTINCT
+  th.TrnLoyaltyAccountId
+FROM
+  `pol-it-cloudtrn-2021042100.TrnCloud.TrnAdvantage` ta  
+JOIN
+  `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` th
+  ON ta.TrnId = th.TrnId
+WHERE
+  ta.TrnAdvId  IN ('wrooc', 'jesien', 'wiosna')
+  AND th.TrnDate >= current_date() - 8
+  AND th.TrnDate >= current_date() - 8
+;
+
+INSERT INTO `pol-it-digiteam-2022062900.DATA_SHARING.ocado_reaktywacja`
+(cre_date, status,  source, person_id, person_id_sf, last_trn)
+SELECT
+    cre_date 
+    ,'CREATED'
+    , 'OCADO'    
+    ,tlt.person_id
+    ,tlt.person_id_sf
+    ,tlt.last_trn
+FROM
+    tmp_lst_trn tlt
+WHERE
+    NOT EXISTS (
+                SELECT 1 FROM `pol-it-digiteam-2022062900.DATA_SHARING.ocado_reaktywacja` oc
+                WHERE oc.person_id = tlt.person_id 
+                      AND oc.last_trn = tlt.last_trn
+                      AND oc.status != 'REMOVED'
+                )
+;
+
+UPDATE `pol-it-digiteam-2022062900.DATA_SHARING.ocado_reaktywacja` 
+SET upd_date = current_date (),
+    status = 'DELETED'
+WHERE 
+  status = 'PENDING'
+  AND person_id_sf in (SELECT TrnLoyaltyAccountId FROM tmp_wykorzystany_kupon)
+;

@@ -1,3 +1,29 @@
+DECLARE v_arrString ARRAY<STRING>;
+
+CREATE TEMP FUNCTION fun(arg STRING)
+RETURNS ARRAY<STRING>
+LANGUAGE js AS 
+  r'''
+let a=arg;
+let slowo='';
+let iter=0;
+let tablica=[];
+while (a.length-1>iter){
+    while(a[iter]!=','&& iter<=a.length-1){
+        if(slowo.length==0 && a[iter]==0)
+            {iter++;
+            continue;
+            }
+        slowo+=a[iter]
+        iter++;
+    }
+    tablica.push(slowo);
+    iter++;
+    slowo='';
+}
+return tablica;
+  ''';
+   
 -- --
 -- -- Krok 1 - identyfikacja nowych rurek kuponowych
 -- --
@@ -186,6 +212,23 @@
 
 with discount as (
  Select 
+ trn.id as id,
+  date(trn.date) as dat,
+  trr.srcTrlCode as rulka,
+  sum(discount)/100 as discount
+from 
+  `auchan-pol-prod.raw_comarch.trans_trr` trr
+join 
+  `auchan-pol-prod.raw_comarch.trans_trn` trn 
+on
+   trr.trnId=trn.id
+-- where 
+--    date(trn.date)='2025-06-23'
+group by 1,2,3
+
+),
+groupDisc as (
+   Select 
   date(trn.date) as dat,
   trr.srcTrlCode as rulka,
   sum(discount)/100 as discount
@@ -198,8 +241,8 @@ on
 -- where 
 --    date(trn.date)='2025-06-23'
 group by 1,2
-
-),cashback as (
+)
+,cashback as (
 select 
 distinct 
 date(trn.date) as dat,
@@ -218,9 +261,97 @@ pointsText like '%AUCH_PT%'
 group by 1,2
 )
 
+,paragony as ( 
+  select
+   trnId,
+   prdId,
+   quantity,
+   value,
+   prdCode 
+  from `auchan-pol-prod.raw_comarch.trans_tpd`
+),
+art as (
+   select
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
+)
+,prod as ( --rozbicie rulki na produkty
+  SELECT
+--  value,
+--  p2.name,
+ p2.offerId,
+  p2.value as rulka,
+  p1.value,
+ fun(p1.value) as tab
+
+FROM `auchan-pol-prod.raw_comarch.promo_param` p1
+INNER JOIN  `auchan-pol-prod.raw_comarch.promo_param` p2
+on p1.offerId=p2.offerId
+where p1.name='AFFECT_CODE'
+and p2.name='COUPON_TYPE'
+)
+,zakupProd as --marza
+(SELECT 
+TAR_NOART as art,
+TAR_DTTR,
+round(avg(TAR_PXBEU),2) as cenaZakupy 
+FROM `auchan-pol-prod.raw_meti_store.MGTAR` mg 
+WHERE TAR_DTTR = (select max(TAR_DTTR) from `auchan-pol-prod.raw_meti_store.MGTAR` mg2 where mg.TAR_NOART=mg2.TAR_NOART)
+group by 1,2
+)
+
+
+
+
+
+-- select * from prod p join discount d on p.rulka=d.rulka
+,rulkaObrotMarza as (
+select 
+pp.trnId,
+p2.dat,
+p1.rulka,
+-- tab,
+prod2,
+quantity,
+pp.value/100 as obrot,
+zP.cenaZakupy,
+round(((pp.value/100-(zP.cenaZakupy*quantity))),2) as marza
+-- p2.discount
+from prod p1
+join discount p2
+on p1.rulka=p2.rulka
+join paragony pp 
+on pp.trnId=p2.id
+join unnest(tab) AS prod2
+join art a on cast(a.nr as string)=cast (prod2 as string)
+join zakupProd zP on cast(zP.art as string)=prod2
+where cast(a.ean as string)=pp.prdCode
+-- join 
+-- `auchan-pol-prod.raw_comarch.promo_param` par
+
+)
+,agrRulka as 
+(
+  select 
+  rulka,
+  dat,
+  sum(obrot) as obrot,
+  sum(marza) as marza
+  from rulkaObrotMarza
+  group by 1,2
+)
+-- select * from zakupy 
+
+
+
 
 -- Łączenie danych z trzech tabel do jednej tabeli wynikowej
 SELECT
+distinct 
   t2.data_uzycia-1,
   t3.identyfikator_typu_kuponu,
   t1.nazwa_typu_kuponu,
@@ -235,6 +366,8 @@ SELECT
   t3.przykladowy_id_kuponu,
   d.discount as discount,
  c.cshb as cash,
+ ag.obrot,
+ ag.marza
 FROM 
   `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step1` t1
 LEFT JOIN
@@ -244,96 +377,12 @@ LEFT JOIN
   `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step3` t3
   ON t1.nazwa_typu_kuponu = t3.nazwa_typu_kuponu
   left join 
-    discount d on d.rulka=t1.nazwa_rulki and d.dat=t2.data_uzycia-1
+    groupDisc d on d.rulka=t1.nazwa_rulki and d.dat=t2.data_uzycia-1
     left join cashback c on c.rulka=t3.nazwa_typu_kuponu and c.dat=t2.data_uzycia-1
+  left join agrRulka ag on ag.rulka=d.rulka and ag.dat=t2.data_uzycia-1
+order by 1 desc
   
 
 
-    -- (select rulka,sum(discount) as disc from discount d
-    -- join 
-    -- `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step1` t1
-    -- on rulka=t1.nazwa_rulki
-    -- where d.dat between
-    -- t1.data_startu_rulki and t1.data_konca_rulki
-    -- group by 1
-    -- ) as d on d.rulka=t1.nazwa_rulki 
---   and d.dat between t1.data_startu_rulki and t1.data_konca_rulki
 
 
-
-
--- left join cashback c on c.rulka=t3.nazwa_typu_kuponu
---   and c.dat between t1.data_startu_rulki and t1.data_konca_rulki
---   group by 1,2,3,4,5,6,7,8,9,10,11,12
-
-
-SELECT * FROM `auchan-pol-prod.raw_meti_store.MGTAR` WHERE 
- TAR_NOART =20902
- and TAR_DTTR >'2025-06-01'
-
---  in (438979,00701222,701243,701246)
-
-
--- SELECT * FROM `auchan-pol-prod.raw_comarch.promo_param`  
--- -- where offerId=313070
--- where value='SK_T2_23_20'
--- -- where offerId=313072
-
-  select
-    ART_NUMER as nr,
-    ART_NAZWA as nazwa,
-    met.EAN_CD as ean
-  from
-    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
-    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN -- where met.EAN_MAIT='O'
-    -- and cast(art_numer as string) in (select string_field_3 from `pol-it-digiteam-2022062900.RADEK.ListaProdPewniDobrego`)
-    -- and cast(art_numer as string) in ('438979','701222','701243','701246')
-    and ART_NAZWA LIKE '%COCA%'
-
-
-    let slowo='';
-let iter=0;
-let tablica=[];
-while (a.length>iter){
-    while(a[iter]!=','){
-        slowo+=a[iter]
-        iter++;
-    }
-    tablica.push(slowo);
-    iter++;
-    slowo='';
-}
- ---- wyciaganie produktow
- DECLARE v_arrString ARRAY<STRING>;
-
-CREATE TEMP FUNCTION fun(arg STRING)
-RETURNS ARRAY<STRING>
-LANGUAGE js AS 
-  r'''
-let a=arg;
-let slowo='';
-let iter=0;
-let tablica=[];
-while (a.length-1>iter){
-    while(a[iter]!=','&& iter<=a.length-1){
-        if(slowo.length==0 && a[iter]==0)
-            {iter++;
-            continue;
-            }
-        slowo+=a[iter]
-        iter++;
-    }
-    tablica.push(slowo);
-    iter++;
-    slowo='';
-}
-return tablica;
-  ''';
-
-
-SELECT
- value,
- fun(value)
-
-FROM `auchan-pol-prod.raw_comarch.promo_param` 
-where offerId=339073 and name='AFFECT_CODE'

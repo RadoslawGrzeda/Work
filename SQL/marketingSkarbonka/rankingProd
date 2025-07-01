@@ -1,0 +1,83 @@
+DECLARE v_dataStart,v_dataEnd DATE;
+DECLARE v_artList ARRAY<STRING>;
+SET v_artList=["69942","170130","890697"];
+SET v_dataStart='2025-06-27';
+SET v_dataEnd='2025-06-29';
+
+
+with art as (
+    select
+      ART_NUMER as nr,
+      ART_NAZWA as nazwa,
+      met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join
+     `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
+  where
+     cast(ART_NUMER as string) in unnest(v_artList)
+)
+,art2 as (
+    select
+      ART_NUMER as nr,
+      ART_NAZWA as nazwa,
+      met.EAN_CD as ean
+  from
+      `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join
+      `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
+
+)
+
+,paragonyZProduktami as (
+select 
+distinct
+  TrnLoyaltyCustomerId as klient,
+  trn.Trnid as paragon,
+  trn.TrnDate
+from 
+  `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+join 
+  `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` trnL
+join 
+  art a on cast(trnL.TrnLineEAN as int)=a.EAN
+on
+   trn.TrnId=trnL.TrnId
+where
+   trn.TrnDate between v_dataStart and v_dataEnd
+and
+   trnL.TrnDate between v_dataStart and v_dataEnd
+and
+   TrnLoyaltyCustomerId is not null 
+)
+,agr as (
+select 
+  pz.TrnDate,
+  pz.klient,
+  paragon,
+  tl.TrnLineEan,
+  a2.nazwa,
+  a2.nr,
+  tl.TrnLineQuantity as ilosc,
+  count(TrnLineEan) over(partition by nr,pz.TrnDate) as art
+from
+ `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl 
+join
+   paragonyZProduktami pz on tl.trnId=pz.paragon 
+join 
+  art2 a2 on a2.ean=cast(tl.TrnLineEAN as int64)
+where
+   tl.TrnDate between v_dataStart and v_dataEnd
+)
+select 
+distinct
+  TrnDate,
+  agr.klient,
+  paragon,
+  agr.TrnLineEan,
+  agr.nr,
+  agr.nazwa,
+  ilosc as iloscKupionych,
+  art as liczbaSprzedanychWCiaguDniaPrzezTychKlientow,
+  DENSE_RANK() over(partition by TrnDate order by art desc) as rankingWCiaguDniaPrzezTychKlientow
+from agr  
