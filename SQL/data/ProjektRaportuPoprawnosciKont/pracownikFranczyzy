@@ -1,0 +1,55 @@
+ with Pracownik as (
+  SELECT  
+   distinct 
+     a.person_id,
+     b.identifier_id,
+     first_name,
+     last_name,
+     a.type_account_indicator as status,
+     value_account_indicator as flaga,
+     last_modification_date as date_of_subscritpion
+  FROM 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.account_indicator` a
+  JOIN 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` b 
+  JOIN 
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ch 
+  on ch.person_id=b.person_id
+    ON a.person_id = b.person_id
+  LEFT JOIN 
+    `auchan-pol-prod.raw_comarch.account_identifier` af 
+    ON af.no = b.identifier_ID
+  WHERE 
+    a.type_account_indicator = 'AIT_04' 
+    and a.is_deleted=False 
+    AND b.is_deleted=False 
+    -- AND a.value_account_indicator in (')
+    AND b.loyalty_status='LOS_01' 
+    AND af.status='A'
+    AND value_account_indicator='AIV_01'
+    -- and last_modification_source like '%HR%'
+    --  and a.person_id='8850096947204'
+    --  and last_modification_date is not null 
+ )
+ ,zakupy as (
+  select
+  distinct
+    identifierNo,
+    locationCode,
+    count(locationCode) as ileNasklepie
+from 
+  `auchan-pol-prod.raw_comarch.trans_trn`
+where
+   locationCode like 'PL_006%'
+and
+   date >='2024-01-01'
+group by 1,2
+-- value_account_indicator
+ )
+ select 
+   p.*,
+   z.locationCode,
+   ileNasklepie,
+   DENSE_RANK() over (partition by identifier_id order by z.ileNasklepie desc )
+ 
+ from pracownik p join zakupy z on z.identifierNo=p.identifier_id

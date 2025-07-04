@@ -1,0 +1,135 @@
+DECLARE v_arrString ARRAY<STRING>;
+DECLARE v_dniAkcji INT64;
+
+CREATE TEMP FUNCTION ileDni(date1 DATE,date2 DATE)
+RETURNs INT64 
+as (
+  date_diff(date2,date1,day)
+);
+-- select * between
+-- '2025-06-20' and'2025-07-02'
+
+CREATE TEMP FUNCTION fun(arg STRING)
+RETURNS ARRAY<STRING>
+LANGUAGE js AS 
+  r'''
+let a=arg;
+let slowo='';
+let iter=0;
+let tablica=[];
+while (a.length-1>iter){
+    while(a[iter]!=','&& iter<=a.length-1){
+        if(slowo.length==0 && a[iter]==0)
+            {iter++;
+            continue;
+            }
+        slowo+=a[iter]
+        iter++;
+    }
+    tablica.push(slowo);
+    iter++;
+    slowo='';
+}
+return tablica;
+  ''';
+
+WITH produkt as ( --rozbicie rulki na produkty
+  SELECT
+--  value,
+--  p2.name,
+ p2.offerId,
+  p2.value as rulka,
+  p1.value ,
+ fun(p1.value) as tab
+
+FROM `auchan-pol-prod.raw_comarch.promo_param` p1
+INNER JOIN  `auchan-pol-prod.raw_comarch.promo_param` p2
+on p1.offerId=p2.offerId
+where p1.name='AFFECT_CODE'
+and p2.name='COUPON_TYPE'
+)
+,paragony as ( 
+  select
+   id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+  -- from `auchan-pol-prod.raw_comarch.trans_tpd` tpd
+  -- join `auchan-pol-prod.raw_comarch.trans_trn` trn
+  -- on tpd.TrnId=trn.id
+  -- where trn.date>'2024-10-01'
+  
+),
+art as (
+   select
+  --  am.*
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    ean
+    -- met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    -- join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
+    -- where art_numer=147661
+),
+infoOKuponie as (
+  select 
+  nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  ileDni(data_startu_rulki,data_konca_rulki) as ileDni
+  from 
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step4`
+)
+, agr as   (
+  select 
+distinct
+nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  data_startu_rulki-(1+ileDni) as data1,
+  data_konca_rulki+(1+ileDni) as data2,
+  value,
+  tab,
+  val,
+  a.ean
+  from 
+  infoOKuponie io
+  join produkt p on io.nazwa_rulki=p.rulka
+  join unnest(tab) as val
+
+  left join art a on cast(a.nr as string)=val
+  
+  where nazwa_rulki='T27_25_vifon'
+
+  order by 1,2 desc
+)
+
+select 
+nazwa_rulki,
+a.ean,
+p.id,
+p.identifierNo,
+quantity,
+p.value,
+
+
+from agr a join paragony p on a.ean=p.ean
+where p.date between a.data_startu_rulki and a.data_konca_rulki
+
+
+/*
+  select
+   id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+*/
