@@ -1,0 +1,138 @@
+DECLARE v_date DATETIME;
+DECLARE v_time TIME;
+SET v_time='17:00:00';
+-- SET v_date='2025-07-14T16:58:37';
+-- select time(v_date)
+
+-- liczba transakcji obrot 
+
+-- if(time(v_date)<v_time,'Przed 17','Po 17')
+-- select if(time(v_date)<v_time,'Przed 17','Po 17')
+-- CREATE TEMP FUNCTION chceck17 (data datetime) 
+-- returns bool as ( 
+-- if()
+-- );
+with status as (
+ select
+   person_id,
+   typKlienta,
+   status
+ from
+   `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` sk 
+ where
+   DataGenerowania in 
+(
+  select
+    max(dataGenerowania)
+  from
+    `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` p2
+     where sk.person_id=p2.person_id
+)
+and 
+  status='AKTYWNY'
+and
+  person_id not in 
+(
+  SELECT 
+    person_id
+  FROM
+   `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` sk
+  where
+    status='AKTYWNY'
+  and 
+    DataGenerowania in 
+    (
+      select
+        max(dataGenerowania)
+      from 
+       `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` p2
+      where
+       sk.person_id=p2.person_id
+    )
+ group by 1 
+ having(count(distinct TypKlienta))>1
+)
+)
+,sztucznyKDR as (
+  SELECT
+   person_id,
+  --  'KDR' as TypKlienta
+  FROM `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` sk where status='AKTYWNY'
+  and 
+DataGenerowania in (select max(dataGenerowania) from `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` p2 where sk.person_id=p2.person_id)
+ group by 1
+ having(count(distinct TypKlienta))>1
+-- order by 2 desc 
+
+)
+,s2KDR as 
+(
+  select 
+  person_id,
+  'KDR' as TypKlienta
+  from sztucznyKDR 
+)
+-- select person_id,count(distinct typKlienta)
+-- from status group by 1 order by 2 desc
+
+,agr as (
+SELECT 
+identifierNo,
+lt.person_id,
+IFNULL(sk.TypKlienta,'LojalnyBezStatusu') as typKlienta,
+date,
+extract(week from date) as tydzien,
+if(time(date)<v_time,'Przed 17','Po 17') as kiedy,
+trn.TotalValue/100 as obrot,
+trn.id
+FROM `auchan-pol-prod.raw_comarch.trans_trn` trn
+left join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt on trn.identifierNo=lt.identifier_id
+left join status sk on sk.person_id = lt.person_id
+left join s2KDR sk2 on lt.person_id=sk2.person_id
+
+ WHERE date >='2025-01-01'
+and identifierNo is not null and identifierNo !=''
+
+)
+-- select 
+-- typKlienta,
+-- date(date),
+-- count(case when kiedy='Przed 17' then identifierNo end) as Przed17,
+-- count(case when kiedy='Po 17' then identifierNo end) as Po17
+-- from agr
+-- group by 1,2
+
+select
+tydzien+1 as tydzien, 
+"Przed 17" as okres,
+typKlienta,
+date(date) as data,
+count(distinct identifierNo) as unikalniKlienci,
+count(distinct id) as liczbaTransakcji,
+round(sum(obrot),2) as obrot
+-- count(case when kiedy='Przed 17' then identifierNo end) as Przed17,
+-- count(case when kiedy='Po 17' then identifierNo end) as Po17
+from agr
+where kiedy='Przed 17'
+
+group by 1,2,3,4
+
+UNION ALL 
+
+
+select 
+tydzien+1 as tydzien,
+"Po 17" as okres,
+typKlienta,
+date(date) as data,
+count(distinct identifierNo) as unikalniKlienci,
+count(distinct id) as liczbaTransakcji,
+round(sum(obrot),2) as obrot
+-- count(case when kiedy='Przed 17' then identifierNo end) as Przed17,
+-- count(case when kiedy='Po 17' then identifierNo end) as Po17
+from agr
+where kiedy='Po 17'
+
+group by 1,2,3,4
+order by data asc,typKlienta
+-- where typKlienta='SENIOR'
