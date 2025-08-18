@@ -1,0 +1,50 @@
+-- dociągnij tu pls, tak jak ostatnio, czy karta jest aktywna, czy jest status pracownika, czy jest i jaki adres e-mail, czy ma DA. Jakbyś dał radę do końca dnia, było by git.
+
+with karty as (
+  select 
+    IF(cast(Numer_karty_Skarbonka as string) like '4%',CONCAT('0',cast(Numer_karty_Skarbonka as string)),cast(Numer_karty_Skarbonka as string)) as karta
+  from 
+    `pol-it-digiteam-2022062900.RADEK.NoweKarty`
+)
+,pracownik as (
+  select 
+  person_id,
+  from 
+  `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` p1
+  where TypKlienta='PRACOWNIK'
+  and Status="AKTYWNY"
+  and DataGenerowania in ( select max(DataGenerowania) from 
+  `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` p2
+  where p1.person_id=p2.person_id )
+)
+,info as (
+  select 
+  distinct
+  lt.person_id,
+  identifier_id as karta ,
+  case when loyalty_status='LOS_01' then 'aktywny' when loyalty_status='LOS_07' then 'niekatywny' else 'inne' end as status_karty ,
+  IF (ac.person_id is not null,'POSIADA','NIE_POSIADA') as czy_ma_DA
+  ,ch.value
+  from 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+  left join (
+  select
+   person_id as id,
+  value
+   from 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` 
+  where channel_type='CHT_04'
+  )
+  ch on lt.person_id=ch.id
+  left join 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac on ac.person_id=lt.person_id
+  -- where ch.channel_type
+  -- ='CHT_04'
+  -- Where identifier_id='0410013104266'
+)
+select 
+k.*,
+o.*,
+IF (p.person_id is null,'NIE','TAK') as czy_pracownik
+from karty k left join info o on k.karta=o.karta
+left join pracownik p on p.person_id=o.person_id
