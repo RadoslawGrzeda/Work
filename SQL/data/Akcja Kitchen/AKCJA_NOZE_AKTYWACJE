@@ -1,0 +1,128 @@
+CREATE OR REPLACE TABLE  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_AKTYWACJE` AS 
+(
+    WITH baza_nozownikow AS -- baza lojalnych, ktorzy kupili prod VKB w trakcie akcji promo
+    (
+        SELECT DISTINCT
+        RIGHT(bh.loy_support_unique_code, 13) AS barcode 
+        /*,bh.basket_unique_code
+        ,bh.basket_sales_date
+        ,bd.product_qty
+        ,ed.ART_NAZWA */   
+        FROM
+        `auchan-pol-prod.edm_sales.f_basket_header` bh
+        JOIN
+        `auchan-pol-prod.edm_sales.f_basket_detail` bd
+        ON bd.basket_unique_code = bh.basket_unique_code
+        JOIN `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` pdf
+            ON pdf.EAN = RIGHT(LEFT(bd.prd_item_unique_code, 21), 13)
+        JOIN `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SLOWINIK` ed 
+            ON cast(ed.EAN as string) = pdf.EAN
+            AND ed.czy_promocja = 'TAK'
+        WHERE
+        date(bh._partitiontime) between '2025-07-01' AND '2025-07-30'
+        AND date(bd._partitiontime) between '2025-07-01' AND '2025-07-30'
+        AND bh.loy_support_unique_code is not null
+    )
+    , zestawienie_dzienne AS 
+    (
+        SELECT 
+            count(baza.no) as ile
+            ,baza.Rejestracja_assign
+            ,baza.Pierwsza_transakcja  
+            ,baza.okres_badany
+            ,baza.czy_kupil_noz
+        FROM
+        (
+            SELECT DISTINCT
+                *
+            FROM
+                (
+                        SELECT 
+                            a.no
+                            ,date(a.firstTrnDate) as Pierwsza_transakcja
+                            ,a.accountId
+                            ,CASE 
+                                WHEN bn.barcode is null
+                                    THEN
+                                        'NIE'
+                                ELSE
+                                        'TAK'
+                            END czy_kupil_noz
+                            ,case 
+                                when e.person_id is not null 
+                                    then 'Zarejestrowana'
+                                else 'Niezarejestrowana'
+                            end as Rejestracja_LOYALTY_TAB
+                            ,case 
+                                when a.assignmentDate is not null 
+                                    then 'Zarejestrowana'
+                                else 'Niezarejestrowana'
+                            end as Rejestracja_assign
+                            ,CASE 
+                                WHEN a.firstTrnDate between '2025-07-01' AND '2025-07-30'
+                                    THEN 'OKRES PRZED AKCJA'
+                                WHEN a.firstTrnDate between '2025-07-31' AND '2025-11-05'
+                                    THEN 'OKRES AKCJI'
+                                ELSE 'OKRES PO AKCJI'
+                            END AS okres_badany                  
+                        FROM 
+                            `auchan-pol-prod.raw_comarch.account_identifier` a
+                        JOIN `auchan-pol-prod.raw_comarch.trans_trn` b 
+                            on a.accountID = b.accountID  
+                            and a.no = b.identifierNo 
+                            and a.firstTrnDate = b.date
+                        LEFT JOIN baza_nozownikow bn 
+                            ON bn.barcode = a.no
+                        LEFT JOIN 
+                            `pol-it-pol9012318-2021052100.JACEKP.WYKLUCZENIA_SPRZEDAŻ_LOYALTY2` loyadel 
+                            on loyadel.loyalty_number = a.no                
+                        LEFT JOIN `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` e 
+                            ON a.no =e.identifier_id  
+                            AND e.is_deleted = false 
+                            AND a.status = 'A'
+                        WHERE 
+                            DATE(a.firstTrnDate) between '2025-07-01' AND '2025-07-30'      
+                            AND b.type = 'ER' 
+                            AND b.locationCode not like ''
+                            AND a.status='A'
+                            AND loyadel.loyalty_number is null
+
+                )
+        ) baza
+        GROUP BY 2, 3, 4, 5
+    )
+    , agregacja AS 
+    (
+        SELECT
+            'WYDANE KARTY' AS status_karty
+            , EXTRACT(ISOWEEK FROM Pierwsza_transakcja) AS tydzien
+            , okres_badany
+            , czy_kupil_noz
+            , sum(ile) AS liczba_kart
+        FROM
+            zestawienie_dzienne
+        GROUP BY 1, 2, 3, 4
+
+        UNION ALL
+
+        SELECT
+            'ZAREJESTROWANE'AS status_karty
+            , EXTRACT(ISOWEEK FROM Pierwsza_transakcja) AS tydzien
+            , okres_badany
+            , czy_kupil_noz
+            , sum(ile) AS liczba_kart
+        FROM
+            zestawienie_dzienne
+        WHERE
+            Rejestracja_assign = 'Zarejestrowana'
+        GROUP BY 1, 2, 3, 4
+    )
+SELECT
+    *
+FROM
+    agregacja
+ORDER BY 2
+)
+;
+
+

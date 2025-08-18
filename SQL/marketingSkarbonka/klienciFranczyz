@@ -1,0 +1,18 @@
+DECLARE v_date DATE;
+SET v_date=date_sub(current_date(),interval 6 month);
+
+SELECT 
+  distinct
+   locationCode,
+   lt.person_id,
+   identifierNo
+FROM 
+  `auchan-pol-prod.raw_comarch.trans_trn` tr
+join
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+on
+   tr.identifierNo=lt.identifier_id
+WHERE
+  date BETWEEN v_date and current_date() 
+and 
+  locationCode in ('PL_00637_MAG','PL_00638_MAG','PL_00639_MAG','PL_00640_MAG','PL_00642_MAG','PL_00655_MAG','PL_00664_MAG')

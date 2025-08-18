@@ -1,0 +1,135 @@
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_STOCK_MAG` AS 
+(
+  SELECT DISTINCT 
+    st.SHOP_NR
+    , st.AST_CDMAG
+    , st.AST_NOART AS id_produktu
+    , sl.ART_NAZWA AS nazwa_prod
+    , st.AST_QTSTOCK AS stock
+    , g.site_sde AS nazwa_sklep
+    , g.site_unique_code
+  FROM 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_STORE.raw_mgast` st
+  JOIN `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SLOWINIK` sl
+    ON sl.ART_NUMER = st.AST_NOART
+  LEFT JOIN 
+    `pol-it-digiteam-2022062900.RAFAL_B.AKCJA_NOZE_GICA` g
+    ON g.GIC = st.AST_CDMAG
+  WHERE 
+    date(current_timestamp_transfer) = current_date()
+    and  sl.czy_promocja = 'TAK'
+)
+;
+
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJE_KITCHEN_PROMOCJA_DETAL` AS
+WITH lista_sklepow AS 
+(
+SELECT
+  msa.site_unique_code AS kod_sklepu
+  ,msa.site_sde AS nazwa_sklepu
+  ,RIGHT(msa.site_format_unique_code, 3) AS rodzaj_sklepu
+  ,gic.gic as nr_sklepu
+FROM 
+  `pol-it-bi-prod-2019121600.POL_BI_MDM.v_mdm_sites_all` msa
+JOIN `pol-it-digiteam-2022062900.RAFAL_B.AKCJA_NOZE_GICA` gic
+  ON CAST(msa.site_code AS INT64) = CAST(gic.site_code AS INT64)
+WHERE
+  gic.site_code <> 'PL03000'
+)
+SELECT DISTINCT
+        bh.basket_unique_code
+        ,bh.basket_sales_date
+        /*,bh.amt_paid_w_tax
+        ,bh.amt_before_disc
+        ,bh.global_disc_amt
+        ,bh.nbr_products
+        ,bh.nbr_distinct_products*/
+        ,l_skl.nr_sklepu
+        ,l_skl.nazwa_sklepu
+        ,l_skl.rodzaj_sklepu        
+        ,CASE 
+            WHEN bd.basket_sales_date between '2024-04-02' AND '2024-05-05'
+                THEN 'OKRES PRZED AKCJA'
+            WHEN bd.basket_sales_date between '2024-05-06' AND '2024-08-04'
+                THEN 'OKRES AKCJI'
+            ELSE 'OKRES PO AKCJI'
+        END AS okres_badany
+        ,CASE 
+            WHEN bh.loy_support_unique_code is not null
+                THEN 'LOJALNY'
+            ELSE 'ZWYKLY'
+        END AS rodzaj_klienta
+        ,ed.SEGMENT_KOD
+        ,ed.KATEGORIA_KOD
+        ,ed.PODKATEGORIA_KOD
+        ,ed.EAN
+        ,pdf.ART_NUMER
+        ,ed.ART_NAZWA
+        ,bd.product_qty
+        ,bd.amt_wo_disc_w_tax AS cena_bez_rabatu
+        ,bd.list_amt_w_tax AS cena_po_rabacie
+        ,bd.discount_amt
+        ,CASE 
+          WHEN bd.discount_amt = 0.0
+            THEN '100%'
+          WHEN bd.product_qty = 1.0 AND bd.list_amt_w_tax = 0.01
+            THEN '1 GROSZ'
+          WHEN bd.product_qty = 1.0 AND bd.amt_wo_disc_w_tax - bd.list_amt_w_tax > 0.01
+            THEN '10 NAKLEJEK'
+          WHEN bd.product_qty > 1.0 AND bd.product_qty * 0.01 = bd.discount_amt
+            THEN '1 GROSZ' 
+          ELSE
+            'INNE PRZYPADKI'
+        END AS rodzaj_oferty
+    FROM
+        `auchan-pol-prod.edm_sales.f_basket_header` bh
+    JOIN 
+        `auchan-pol-prod.edm_sales.f_basket_detail` bd
+        ON bh.basket_unique_code = bd.basket_unique_code
+    JOIN 
+        `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` pdf
+        ON pdf.EAN = RIGHT(LEFT(bd.prd_item_unique_code, 21), 13)
+    JOIN 
+        `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SLOWINIK` ed 
+        ON ed.EAN = pdf.EAN
+    LEFT JOIN 
+      lista_sklepow l_skl
+      ON l_skl.kod_sklepu = bh.site_unique_code
+
+    WHERE
+        date(bh._partitiontime) between '2024-05-06' AND '2024-08-04'
+        AND date(bd._partitiontime) between '2024-05-06' AND '2024-08-04'
+        AND ed.czy_promocja = 'TAK'
+        AND bd.list_amt_w_tax >= 0
+  --ORDER BY l_skl.nazwa_sklepu
+;
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJE_KITCHEN_PROMOCJA_AGREGAT` AS
+(
+SELECT
+  EXTRACT(ISOWEEK FROM prd.basket_sales_date) AS tydzien
+  ,current_date() AS data_raport
+  ,prd.okres_badany
+  ,prd.nr_sklepu
+  ,prd.nazwa_sklepu
+  ,prd.rodzaj_sklepu
+  ,prd.rodzaj_klienta
+  ,prd.ART_NAZWA
+  ,prd.EAN
+  ,prd.KATEGORIA_KOD
+  ,prd.PODKATEGORIA_KOD
+  ,prd.rodzaj_oferty 
+  ,mag.stock AS stock 
+  ,CAST(sum(prd.product_qty) AS INT64) AS liczba_prod
+  ,round(sum(prd.cena_po_rabacie), 2) AS obrot
+FROM
+  `pol-it-digiteam-2022062900.RADEK.AKCJE_KITCHEN_PROMOCJA_DETAL` prd
+LEFT JOIN  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_STOCK_MAG` mag
+  ON mag.AST_CDMAG = prd.nr_sklepu
+  AND mag.id_produktu = prd.ART_NUMER
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+)
+;
+
+
