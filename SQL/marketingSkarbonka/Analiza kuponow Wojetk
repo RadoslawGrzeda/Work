@@ -1,0 +1,118 @@
+DECLARE v_arrString ARRAY<STRING>;
+
+CREATE TEMP FUNCTION fun(arg STRING)
+RETURNS ARRAY<STRING>
+LANGUAGE js AS 
+  r'''
+let a=arg;
+let slowo='';
+let iter=0;
+let tablica=[];
+while (a.length-1>iter){
+    while(a[iter]!=','&& iter<=a.length-1){
+        if(slowo.length==0 && a[iter]==0)
+            {iter++;
+            continue;
+            }
+        slowo+=a[iter]
+        iter++;
+    }
+    tablica.push(slowo);
+    iter++;
+    slowo='';
+}
+return tablica;
+''';
+
+
+with kody as (
+  select
+  string_field_0 as kod,
+  off.id as id,
+  p1.name,value,
+  fun(p1.value) as prod
+  from
+  `pol-it-digiteam-2022062900.RADEK.swc2` sw
+join `auchan-pol-prod.raw_comarch.promo_offer` off
+on off.code=sw.string_field_0
+join `auchan-pol-prod.raw_comarch.promo_param` p1
+on p1.offerId=off.id
+where p1.name='TRIGGR_CODE'
+)
+-- select * from kody 
+,transakcja as (
+SELECT 
+  trn.id,
+  identifierNo as karta,
+  date,
+  totalValue as val,
+  locationCode,
+  pointsText,
+  srcTrlCode as kod,
+  discount
+ FROM
+  `auchan-pol-prod.raw_comarch.trans_trn` trn
+  JOIN `auchan-pol-prod.raw_comarch.trans_trr` trr on trn.id=trr.trnid
+  JOIN `pol-it-digiteam-2022062900.RADEK.swc2` sw on sw.string_field_0=trr.srcTrlCode
+  where date(trn.date)='2025-08-07'
+
+)
+ ,art as (  
+  select
+    k.kod,
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
+  -- where ART_NUMER in (select p from kody join unnest(prod) as p)
+  join kody k on cast(ART_NUMER as string) in unnest(prod)
+)
+-- select * from art 
+-- select * from transakcja
+
+,szczegol as ( 
+  select
+   trnId,
+   prdId,
+   quantity,
+   value,
+   prdCode 
+  from `auchan-pol-prod.raw_comarch.trans_tpd`
+)
+SELECT 
+  id,
+  karta,
+  date(date) as data,
+  locationCode as lokalizacja,
+  t.kod,
+  a.nr,
+  a.nazwa
+
+FROM 
+transakcja t
+join szczegol s
+on t.id=s.trnid
+join art a on cast(a.ean as string)=s.prdCode
+and a.kod=t.kod
+-- ),art as (
+--    select
+--     ART_NUMER as nr,
+--     ART_NAZWA as nazwa,
+--     met.EAN_CD as ean
+--   from
+--     `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+--     join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
+-- )
+
+
+
+
+-- select * from prod 
+
+-- SELECT * FROM `auchan-pol-prod.raw_comarch.trans_trr`
+
+--  where srcTrlCode like 'SWC_T32_25_5_20PLN'
+
+--  Ok, to nr karty skarbonka, artykuł tylko z użytą rulką do promocji, moze być nr paragonu.  Nr sklepu, gdzie byl zakup.  Na spokojnie. Dane tylko z dziś.
