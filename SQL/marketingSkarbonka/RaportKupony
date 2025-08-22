@@ -24,192 +24,33 @@ while (a.length-1>iter){
 return tablica;
   ''';
    
--- --
--- -- Krok 1 - identyfikacja nowych rurek kuponowych
--- --
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step4` as
 
--- -- INSERT INTO `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step1`
+-- Łączenie danych z trzech tabel do jednej tabeli wynikowej
+SELECT
+  t2.data_uzycia,
+  t3.identyfikator_typu_kuponu,
+  t1.nazwa_typu_kuponu,
+  t1.id_rulki,
+  t1.nazwa_rulki,
+  t1.data_utworzenia_rulki,
+  t1.data_startu_rulki,
+  t1.data_konca_rulki,
+  t3.liczba_kuponow,
+  t2.ilosc_uzyc,
+  t2.ilosc_poprawnych_uzyc,
+  t3.przykladowy_id_kuponu
+FROM
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step1` t1
+LEFT JOIN
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step2` t2
+  ON t1.nazwa_typu_kuponu = t2.nazwa_typu_kuponu
+LEFT JOIN
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step3` t3
+  ON t1.nazwa_typu_kuponu = t3.nazwa_typu_kuponu
+  ;
 
--- SELECT 
---     -- Nazwa typu kuponu i przypisana rulka
---     bt.value AS nazwa_typu_kuponu, 
---     bt.offerId AS id_rulki,
---     tr.name AS nazwa_rulki,
-    
---     -- Daty związane z rulką
---     DATE(tr.startDate) AS data_startu_rulki,
---     DATE(tr.endDate) AS data_konca_rulki,
---     DATE(tr.cre_date) AS data_utworzenia_rulki,
-
--- FROM `auchan-pol-prod.raw_comarch.promo_param` bt
--- JOIN `auchan-pol-prod.raw_comarch.promo_offer` tr 
---      ON bt.offerId = tr.id
-
--- WHERE 
---     -- Zakres dat utworzenia rulki "od do"
---     tr.cre_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) 
---     AND tr.cre_date < TIMESTAMP(CURRENT_DATE())
---     -- tr.cre_date>='2025-01-16'
---     -- Tylko rulki, które mają przypisany jakiś typ kuponów (WAŻNE)
---     AND bt.name = 'COUPON_TYPE';
-
-
-
-
--- --
--- -- Krok 2 - zasilenie tabeli z nowymi transakcjami
--- --
-
--- INSERT INTO `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step2`
-
--- WITH 
-
--- -- Z tabeli transakcyjnej pobieramy dane dotyczące użytych typów kuponów
--- transakcyjne_surowe AS (  
---     SELECT    
---         ctpCode,    
---         --DATE(cre_date) AS data_uzycia,  
---          --DATE(trn.date) as data_uzycia
---         useResult  
---         FROM `auchan-pol-prod.raw_comarch.trans_tcp` tcp
-            -- join     `auchan-pol-prod.raw_comarch.trans_tcp` trn
-            -- ontcp.trnId=trn.id
-        
---         WHERE        
---         -- Zakres dat transakcji "od do"
---         cre_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) 
---         AND cre_date < TIMESTAMP(CURRENT_DATE())
-
--- ),
-
--- -- Wyodrębniamy unikalne typy kuponów 
--- typy_kuponow AS (  
---     SELECT DISTINCT    
---         ctpCode as nazwa_typu_kuponu  
-    
---     FROM transakcyjne_surowe 
--- ),
-
--- -- Liczymy wszystkie użycia typów kuponów 
--- ilosc_uzyc AS (  
---     SELECT    
---         ctpCode as nazwa_typu_kuponu,    
---         COUNT(*) AS ilosc_uzyc,    
---         data_uzycia  
-
---     FROM transakcyjne_surowe
-
---     GROUP BY ctpCode, data_uzycia 
--- ),
-
--- -- Liczymy tylko poprawne użycia typów kuponów 
--- ilosc_poprawnych_uzyc AS (  
---     SELECT    
---         ctpCode as nazwa_typu_kuponu,
---         data_uzycia,    
---         COUNT(*) AS ilosc_poprawnych_uzyc  
-
---     FROM transakcyjne_surowe
-
---     WHERE useResult = 'U'  
-    
---     GROUP BY ctpCode, data_uzycia 
--- )
-
--- -- Łączymy dane z powyższych zapytań
-
--- SELECT  
---     tk.nazwa_typu_kuponu,  
---     iu.data_uzycia,  
---     iu.ilosc_uzyc,  
---     COALESCE(pu.ilosc_poprawnych_uzyc, 0) AS ilosc_poprawnych_uzyc
-
--- FROM typy_kuponow tk 
-
--- LEFT JOIN ilosc_uzyc iu ON tk.nazwa_typu_kuponu = iu.nazwa_typu_kuponu 
-
--- LEFT JOIN ilosc_poprawnych_uzyc pu 
---     ON tk.nazwa_typu_kuponu = pu.nazwa_typu_kuponu
---     AND iu.data_uzycia = pu.data_uzycia;
-
-
-
-
--- -- 
--- -- Krok 3 - dodatkowe informacje o typach kuponow
--- -- 
-
--- INSERT INTO `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step3`
-
--- -- Sprawdź, które TYPY kuponów JUŻ ISTNIEJĄ w tabeli docelowej (step3) - BEZ FILTROWANIA DATY
--- WITH istniejace_juz_typy_kuponow_dla_filtra AS (
---     SELECT DISTINCT nazwa_typu_kuponu
---     FROM `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step3`
--- ),
-
--- -- W tabeli transkacyjnycej znajduję TYPY kuponów użytych wczoraj oraz pierwszy identyfikator KUPONU dla każdego z typów
--- typy_kuponow AS (
---     SELECT 
---         ctpCode as nazwa_typu_kuponu, 
---         MIN(coupon_id) as przykladowy_id_kuponu, 
---         DATE(MIN(cre_date)) as cre_date
---     FROM `auchan-pol-prod.raw_comarch.trans_tcp` 
-
---     WHERE 
---         cre_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) 
---         AND cre_date < TIMESTAMP(CURRENT_DATE())
---         AND ctpCode != ''
-
---     GROUP BY ctpCode
---     ORDER BY ctpCode
--- ),
-
--- -- Szukam IDENTYFIKATORA TYPU kuponu (cpnTypeId) dla każdego znalezionego przed chwilą przykladowego id KUPONU (przykladowy_id_kuponu)
--- identyfikatory_typow_kuponow AS (
---     SELECT 
---         id,
---         cpnTypeId as identyfikator_typu_kuponu,
---         t.nazwa_typu_kuponu
-
---     FROM `auchan-pol-prod.raw_comarch.account_coupon` c
---     JOIN typy_kuponow t ON c.id = t.przykladowy_id_kuponu
--- ),
-
--- -- Liczę wystawione kupony dla każdego IDENTYFIKATORA TYPU kuponu
--- licznik_kuponow AS (
---     SELECT 
---         cpnTypeId AS id_typu_kuponu,
---         COUNT(*) AS liczba_kuponow
-
---     FROM `auchan-pol-prod.raw_comarch.account_coupon`
---     WHERE cpnTypeId IN (SELECT identyfikator_typu_kuponu FROM identyfikatory_typow_kuponow)
-    
---     GROUP BY cpnTypeId
--- )
-
--- -- Łączę wszystkie dane z poprzednich kroków
--- SELECT 
---     i.nazwa_typu_kuponu,
---     i.identyfikator_typu_kuponu,
---     t.przykladowy_id_kuponu,
---     l.liczba_kuponow
-
--- FROM identyfikatory_typow_kuponow i
-
--- JOIN typy_kuponow t ON i.nazwa_typu_kuponu = t.nazwa_typu_kuponu
-
--- JOIN licznik_kuponow l ON i.identyfikator_typu_kuponu = l.id_typu_kuponu
-
--- -- Filtracja - pomijamy typy kuponów, które już KIEDYKOLWIEK zostały dodane do tabeli step3
--- WHERE i.nazwa_typu_kuponu NOT IN (SELECT nazwa_typu_kuponu FROM istniejace_juz_typy_kuponow_dla_filtra);
-
-
--- --
--- -- Krok 4 - budowanie tabeli
--- --
-
--- CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step4` as
-
+  CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step5` as
 with discount as (
  Select 
  trn.id as id,
@@ -352,7 +193,7 @@ where cast(a.ean as string)=pp.prdCode
 -- Łączenie danych z trzech tabel do jednej tabeli wynikowej
 SELECT
 distinct 
-  t2.data_uzycia-1,
+  t2.data_uzycia-1 as dataUzycia,
   t3.identyfikator_typu_kuponu,
   t1.nazwa_typu_kuponu,
   t1.id_rulki,

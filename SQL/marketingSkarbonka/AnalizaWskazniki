@@ -133,3 +133,592 @@ where p.date between a.data_startu_rulki and a.data_konca_rulki
    prdCode as ean 
    from `pol-it-digiteam-2022062900.RADEK.trn2`
 */
+
+----
+
+DECLARE v_arrString ARRAY<STRING>;
+DECLARE v_dniAkcji INT64;
+
+CREATE TEMP FUNCTION ileDni(date1 DATE,date2 DATE)
+RETURNs INT64 
+as (
+  date_diff(date2,date1,day)
+);
+-- select * between
+-- '2025-06-20' and'2025-07-02'
+
+CREATE TEMP FUNCTION fun(arg STRING)
+RETURNS ARRAY<STRING>
+LANGUAGE js AS 
+  r'''
+let a=arg;
+let slowo='';
+let iter=0;
+let tablica=[];
+while (a.length-1>iter){
+    while(a[iter]!=','&& iter<=a.length-1){
+        if(slowo.length==0 && a[iter]==0)
+            {iter++;
+            continue;
+            }
+        slowo+=a[iter]
+        iter++;
+    }
+    tablica.push(slowo);
+    iter++;
+    slowo='';
+}
+return tablica;
+  ''';
+
+WITH produkt as ( --rozbicie rulki na produkty
+  SELECT
+--  value,
+--  p2.name,
+ p2.offerId,
+  p2.value as rulka,
+  p1.value ,
+ fun(p1.value) as tab
+
+FROM `auchan-pol-prod.raw_comarch.promo_param` p1
+INNER JOIN  `auchan-pol-prod.raw_comarch.promo_param` p2
+on p1.offerId=p2.offerId
+where p1.name='AFFECT_CODE'
+and p2.name='COUPON_TYPE'
+)
+,paragony as ( 
+  select
+  --  trn.id,
+  id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+  -- from `auchan-pol-prod.raw_comarch.trans_tpd` tpd
+  -- join `auchan-pol-prod.raw_comarch.trans_trn` trn
+  -- on tpd.TrnId=trn.id
+  -- where trn.date>'2025-01-01'
+  -- and tpd.date>'2025-05-01'
+  
+),
+art as (
+   select
+  --  am.*
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    -- ean
+    met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on EAN_NOART=art_numer 
+    -- on cast (met.EAN_CD as string) = am.EAN 
+    -- where art_numer=147661
+),
+infoOKuponie as (
+  select 
+  nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  ileDni(data_startu_rulki,data_konca_rulki) as ileDni
+  from 
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step4`
+)
+, agr as   (
+  select 
+distinct
+nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  data_startu_rulki-(1+ileDni) as data1,
+  data_konca_rulki+(1+ileDni) as data2,
+  value,
+  tab,
+  val,
+  a.ean
+  from 
+  infoOKuponie io
+  join produkt p on io.nazwa_rulki=p.rulka
+  join unnest(tab) as val
+
+  left join art a on cast(a.nr as string)=val
+  
+  where nazwa_rulki='T01_25_wedel'
+
+  order by 1,2 desc
+)
+,wszystko as (
+select 
+nazwa_rulki,
+date,
+data_startu_rulki,
+data_konca_rulki,
+a.ean,
+p.id,
+p.identifierNo,
+quantity,
+p.value/100 as val,
+-- data1,
+-- data2,
+-- data_startu_rulki-1 as datt1,
+-- data_konca_rulki+1 as datt2,
+case when 
+  date(date) between data_startu_rulki and data_konca_rulki then 'akcja' 
+  when date(date) between data1 and a.data_startu_rulki-1 then 'przedAkcja'
+  when date(date) between  data_konca_rulki+1 and data2  then 'poAkcji' end as okres
+from agr a join paragony p on cast(a.ean as string)=p.ean
+where p.date between data1 and data2
+)
+select * from wszystko 
+-- select 
+-- okres,
+-- -- data_startu_rulki,
+-- -- data_konca_rulki,
+-- -- data1,
+-- -- data2,
+-- -- datt1,
+-- -- datt2,
+-- nazwa_rulki,
+-- count(distinct id) as Paragony,
+-- count(distinct identifierNo) as unikalniKlienci,
+-- sum(quantity) as ilos,
+-- sum(val) as obrot
+-- from wszystko
+-- group by 1,2
+-- ,2,3,4,5,6,7,8
+/*
+  select
+   id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+*/
+
+
+
+
+
+----
+
+DECLARE v_arrString ARRAY<STRING>;
+DECLARE v_dniAkcji INT64;
+
+CREATE TEMP FUNCTION ileDni(date1 DATE,date2 DATE)
+RETURNs INT64 
+as (
+  date_diff(date2,date1,day)
+);
+-- select * between
+-- '2025-06-20' and'2025-07-02'
+
+CREATE TEMP FUNCTION fun(arg STRING)
+RETURNS ARRAY<STRING>
+LANGUAGE js AS 
+  r'''
+let a=arg;
+let slowo='';
+let iter=0;
+let tablica=[];
+while (a.length-1>iter){
+    while(a[iter]!=','&& iter<=a.length-1){
+        if(slowo.length==0 && a[iter]==0)
+            {iter++;
+            continue;
+            }
+        slowo+=a[iter]
+        iter++;
+    }
+    tablica.push(slowo);
+    iter++;
+    slowo='';
+}
+return tablica;
+  ''';
+
+WITH produkt as ( --rozbicie rulki na produkty
+  SELECT
+--  value,
+--  p2.name,
+ p2.offerId,
+  p2.value as rulka,
+  p1.value ,
+ fun(p1.value) as tab
+
+FROM `auchan-pol-prod.raw_comarch.promo_param` p1
+INNER JOIN  `auchan-pol-prod.raw_comarch.promo_param` p2
+on p1.offerId=p2.offerId
+where p1.name='AFFECT_CODE'
+and p2.name='COUPON_TYPE'
+)
+,paragony as ( 
+  select
+  --  trn.id,
+  id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+  -- from `auchan-pol-prod.raw_comarch.trans_tpd` tpd
+  -- join `auchan-pol-prod.raw_comarch.trans_trn` trn
+  -- on tpd.TrnId=trn.id
+  -- where trn.date>'2025-01-01'
+  -- and tpd.date>'2025-05-01'
+  
+),
+art as (
+   select
+  --  am.*
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    -- ean
+    met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on EAN_NOART=art_numer 
+    -- on cast (met.EAN_CD as string) = am.EAN 
+    -- where art_numer=147661
+),
+infoOKuponie as (
+  select 
+  nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  ileDni(data_startu_rulki,data_konca_rulki) as ileDni
+  from 
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step4`
+)
+, agr as   (
+  select 
+distinct
+nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  data_startu_rulki-(1+ileDni) as data1,
+  data_konca_rulki+(1+ileDni) as data2,
+  value,
+  tab,
+  val,
+  a.ean
+  from 
+  infoOKuponie io
+  join produkt p on io.nazwa_rulki=p.rulka
+  join unnest(tab) as val
+
+  left join art a on cast(a.nr as string)=val
+  
+  -- where nazwa_rulki='T01_25_wedel'
+
+  order by 1,2 desc
+)
+,wszystko as (
+select 
+nazwa_rulki,
+date,
+data_startu_rulki,
+data_konca_rulki,
+a.ean,
+p.id,
+p.identifierNo,
+quantity,
+p.value/100 as val,
+-- data1,
+-- data2,
+-- data_startu_rulki-1 as datt1,
+-- data_konca_rulki+1 as datt2,
+case when 
+  date(date) between data_startu_rulki and data_konca_rulki then 'akcja' 
+  when date(date) between data1 and a.data_startu_rulki-1 then 'przedAkcja'
+  when date(date) between  data_konca_rulki+1 and data2  then 'poAkcji' end as okres
+from agr a join paragony p on cast(a.ean as string)=p.ean
+where p.date between data1 and data2
+)
+select * from wszystko 
+-- select 
+-- okres,
+-- -- data_startu_rulki,
+-- -- data_konca_rulki,
+-- -- data1,
+-- -- data2,
+-- -- datt1,
+-- -- datt2,
+-- nazwa_rulki,
+-- count(distinct id) as Paragony,
+-- count(distinct identifierNo) as unikalniKlienci,
+-- sum(quantity) as ilos,
+-- sum(val) as obrot
+-- from wszystko
+-- group by 1,2
+-- ,2,3,4,5,6,7,8
+/*
+  select
+   id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+*/
+
+
+----- 
+
+chyba done 
+
+DECLARE v_arrString ARRAY<STRING>;
+DECLARE v_dniAkcji INT64;
+
+CREATE TEMP FUNCTION ileDni(date1 DATE,date2 DATE)
+RETURNs INT64 
+as (
+  date_diff(date2,date1,day)
+);
+-- select * between
+-- '2025-06-20' and'2025-07-02'
+
+CREATE TEMP FUNCTION fun(arg STRING)
+RETURNS ARRAY<STRING>
+LANGUAGE js AS 
+  r'''
+let a=arg;
+let slowo='';
+let iter=0;
+let tablica=[];
+while (a.length-1>iter){
+    while(a[iter]!=','&& iter<=a.length-1){
+        if(slowo.length==0 && a[iter]==0)
+            {iter++;
+            continue;
+            }
+        slowo+=a[iter]
+        iter++;
+    }
+    tablica.push(slowo);
+    iter++;
+    slowo='';
+}
+return tablica;
+  ''';
+
+WITH produkt as ( --rozbicie rulki na produkty
+  SELECT
+--  value,
+--  p2.name,
+ p2.offerId,
+  p2.value as rulka,
+  p1.value ,
+ fun(p1.value) as tab
+
+FROM `auchan-pol-prod.raw_comarch.promo_param` p1
+INNER JOIN  `auchan-pol-prod.raw_comarch.promo_param` p2
+on p1.offerId=p2.offerId
+where p1.name='AFFECT_CODE'
+and p2.name='COUPON_TYPE'
+)
+,paragony as ( 
+  select
+   trn.id,
+  -- id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+  --  from `pol-it-digiteam-2022062900.RADEK.trn2`
+  from `auchan-pol-prod.raw_comarch.trans_tpd` tpd
+  join `auchan-pol-prod.raw_comarch.trans_trn` trn
+  on tpd.TrnId=trn.id
+  where trn.date>'2025-01-01'
+  -- and tpd.date>'2025-05-01'
+  
+),
+art as (
+   select
+  --  am.*
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    -- ean
+    met.EAN_CD as ean
+  from
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on EAN_NOART=art_numer 
+    -- on cast (met.EAN_CD as string) = am.EAN 
+    -- where art_numer=147661
+),
+infoOKuponie as (
+  select 
+  nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  ileDni(data_startu_rulki,data_konca_rulki) as ileDni
+  from 
+  `pol-it-digiteam-2022062900.PJAB.raport_kupony_tabela_ogolna_step4`
+)
+
+, agr as   (
+  select 
+distinct
+nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  data_startu_rulki-(1+ileDni) as data1,
+  data_konca_rulki+(1+ileDni) as data2,
+  value,
+  tab,
+  val,
+  a.ean
+  from 
+  infoOKuponie io
+  join produkt p on io.nazwa_rulki=p.rulka
+  join unnest(tab) as val
+
+  left join art a on cast(a.nr as string)=val
+  
+  -- where nazwa_rulki='T01_25_wedel'
+
+  order by 1,2 desc
+)
+,kuponyNieProd as (
+  select 
+  nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  ileDni(data_startu_rulki,data_konca_rulki) as ileDni
+
+   from 
+  infoOKuponie io 
+  where io.nazwa_rulki not in (select nazwa_rulki from agr)
+)
+, agr2 as   (
+  select 
+distinct
+nazwa_rulki,
+  data_startu_rulki,
+  data_konca_rulki,
+  data_startu_rulki-(1+ileDni) as data1,
+  data_konca_rulki+(1+ileDni) as data2,
+  -- value,
+  -- tab,
+  -- val,
+  -- a.ean
+  from 
+  kuponyNieProd io
+  -- join produkt p on io.nazwa_rulki=p.rulka
+  -- join unnest(tab) as val
+
+  -- left join art a on cast(a.nr as string)=val
+  
+  -- where nazwa_rulki='T01_25_wedel'
+
+  order by 1,2 desc
+)
+
+,wszystko as (
+select 
+nazwa_rulki,
+date,
+data_startu_rulki,
+data_konca_rulki,
+a.ean,
+p.id,
+p.identifierNo,
+quantity,
+p.value/100 as val,
+-- data1,
+-- data2,
+-- data_startu_rulki-1 as datt1,
+-- data_konca_rulki+1 as datt2,
+case when 
+  date(date) between data_startu_rulki and data_konca_rulki then 'akcja' 
+  when date(date) between data1 and a.data_startu_rulki-1 then 'przedAkcja'
+  when date(date) between  data_konca_rulki+1 and data2  then 'poAkcji' end as okres
+from agr a join paragony p on cast(a.ean as string)=p.ean
+where p.date between data1 and data2
+)
+
+,wszystko2 as (
+select 
+nazwa_rulki,
+date,
+data_startu_rulki,
+data_konca_rulki,
+id,
+identifierNo,
+totalValue/100 as val,
+-- p.value/100 as val,
+-- data1,
+-- data2,
+-- data_startu_rulki-1 as datt1,
+-- data_konca_rulki+1 as datt2,
+case when 
+  date(date) between data_startu_rulki and data_konca_rulki then 'akcja' 
+  when date(date) between data1 and a.data_startu_rulki-1 then 'przedAkcja'
+  when date(date) between  data_konca_rulki+1 and data2  then 'poAkcji' end as okres
+from agr2 a join `auchan-pol-prod.raw_comarch.trans_trn` trn on trn.date between data1 and data2
+
+)
+
+
+
+-- select * from wszystko 
+select 
+okres,
+'ZPROD' as co,
+
+-- data_startu_rulki,
+-- data_konca_rulki,
+-- data1,
+-- data2,
+-- datt1,
+-- datt2,
+nazwa_rulki,
+count(distinct id) as Paragony,
+count(distinct identifierNo) as unikalniKlienci,
+sum(quantity) as ilos,
+sum(val) as obrot
+from wszystko
+group by 1,2,3
+
+UNION ALL 
+
+select 
+okres,
+'BEZPROD' as co,
+-- data_startu_rulki,
+-- data_konca_rulki,
+-- data1,
+-- data2,
+-- datt1,
+-- datt2,
+nazwa_rulki,
+count(distinct id) as Paragony,
+count(distinct identifierNo) as unikalniKlienci,
+-- sum(quantity) as ilos,
+0 as ilosc,
+sum(val) as obrot
+from wszystko2
+group by 1,2,3
+
+-- ,2,3,4,5,6,7,8
+/*
+  select
+   id,
+   date,
+   identifierNo,
+   prdId,
+   quantity,
+   value,
+   prdCode as ean 
+   from `pol-it-digiteam-2022062900.RADEK.trn2`
+*/
