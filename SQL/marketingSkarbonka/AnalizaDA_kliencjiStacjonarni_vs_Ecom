@@ -1,0 +1,56 @@
+-- SELECT * FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` where 
+DECLARE v_person STRING;
+DECLARE v_curr,v_30,v_do3miesiecy,v_mniej3miesiace DATE;
+SET v_30 =date_sub(current_date(),interval 1 month);
+SET v_do3miesiecy =date_sub(current_date(),interval 3 month);
+SET v_mniej3miesiace =date_sub(current_date(),interval 3 month);
+-- select v_30,v_do3miesiecy,v_mniej3miesiace
+SET v_curr=current_date();
+set v_person='0017S00000FNj55QAD';
+-- set v_person='0012o00002vQaF6AAK';
+-- SELECT * FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.subscription` where 
+-- -- item_subscription_code='SUI_PL_101' and subscription_status='SUS_02'
+--  person_id='0017S00000FNj55QAD'
+-- person_id='0017S000007W62qQAC'
+-- select * from auchan-pol-prod.raw_salesforce_customerbase_sec.channel where person_id='0017S000007W62qQAC'
+
+with StacjonarnyAktywny30dni as (
+  select 
+  distinct 
+  lt.person_id
+  from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+  where trn.TrnDate between v_30 and v_curr 
+)
+,StacjonarnyAktywny3Miesiace as (
+  select 
+  distinct 
+  lt.person_id
+  from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+  where trn.TrnDate between v_do3miesiecy and v_curr 
+),
+StacjonarnyNiaktywnyZakupowo3Miesiace as (
+  select 
+  distinct 
+  lt.person_id,
+  -- trn.trndate as date
+  from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+  except DISTINCT 
+  select 
+  distinct 
+  lt.person_id,
+  -- trn.trndate as date
+  from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+  where trn.TrnDate between v_mniej3miesiace and v_curr
+ 
+)
+select * from 
+-- StacjonarnyNiaktywnyZakupowo3Miesiace 
+StacjonarnyAktywny30dni
