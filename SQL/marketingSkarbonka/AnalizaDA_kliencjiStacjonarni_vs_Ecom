@@ -50,7 +50,254 @@ StacjonarnyNiaktywnyZakupowo3Miesiace as (
   on trn.TrnLoyaltyCustomerId=lt.identifier_id 
   where trn.TrnDate between v_mniej3miesiace and v_curr
  
+),zgodaNaMail
+as (
+  Select person_id,
+  value,
+  channel_type,
+  flag_main_type,
+  optin_channel
+  FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+   where channel_type in ("CHT_04") and optin_channel=true
+    
 )
+,zgodaTel
+as (
+    Select person_id,
+  value,
+  channel_type,
+  flag_main_type,
+  optin_channel
+  FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+   where channel_type in ("CHT_05",'CHT_06') and optin_channel=true
+   
+)
+  --  ("CHT_02")  and value like '+%'
+
+
+
+-- channel_type
+-- CHT_05 ok 
+-- CHT_06 ok 
+-- CHT_08
+-- CHT_02
+-- )
 select * from 
 -- StacjonarnyNiaktywnyZakupowo3Miesiace 
 StacjonarnyAktywny30dni
+
+
+
+
+
+
+-- SELECT * FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` where 
+DECLARE v_person STRING;
+DECLARE v_curr,v_30,v_do3miesiecy,v_mniej3miesiace DATE;
+SET v_30 =date_sub(current_date(),interval 1 month);
+SET v_do3miesiecy =date_sub(current_date(),interval 3 month);
+SET v_mniej3miesiace =date_sub(current_date(),interval 3 month);
+-- select v_30,v_do3miesiecy,v_mniej3miesiace
+SET v_curr=current_date();
+set v_person='0017S00000FNj55QAD';
+-- set v_person='0012o00002vQaF6AAK';
+-- SELECT * FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.subscription` where 
+-- -- item_subscription_code='SUI_PL_101' and subscription_status='SUS_02'
+--  person_id='0017S00000FNj55QAD'
+-- person_id='0017S000007W62qQAC'
+-- select * from auchan-pol-prod.raw_salesforce_customerbase_sec.channel where person_id='0017S000007W62qQAC'
+
+-- with StacjonarnyAktywny30dni as (
+--   select 
+--   distinct 
+--   lt.person_id
+--   from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+--   join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+--   on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+--   where trn.TrnDate between v_30 and v_curr 
+-- )
+--  with StacjonarnyAktywny30dni as (
+
+-- )
+-- ,StacjonarnyAktywny3Miesiace as (
+--   select 
+--   distinct 
+--   lt.person_id
+--   from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+--   join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+--   on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+--   where trn.TrnDate between v_do3miesiecy and v_curr 
+-- )
+-- ,StacjonarnyNiaktywnyZakupowo3Miesiace as (
+--   select 
+--   distinct 
+--   lt.person_id,
+--   -- trn.trndate as date
+--   from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+--   join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+--   on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+--   except DISTINCT 
+--   select 
+--   distinct 
+--   lt.person_id,
+--   -- trn.trndate as date
+--   from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+--   join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+--   on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+--   where trn.TrnDate between v_mniej3miesiace and v_curr
+ 
+-- )
+with StacjonarnyAktywny30dni as (
+   select 
+  distinct 
+  lt.person_id
+  from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on trn.TrnLoyaltyCustomerId=lt.identifier_id 
+  where trn.TrnDate between v_30 and v_curr 
+  and is_deleted=false
+  -- select 
+  -- distinct 
+  -- lt.person_id
+  -- from `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  -- join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  -- on trn.TrnLoyaltyCustomerId=lt.identifier_id
+  -- select
+  --   distinct 
+  --   ac.person_id,
+  --   -- TrnLoyaltyAccountId as id,
+
+  -- from
+  --   `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  --   join `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+  --   on trn.TrnLoyaltyAccountId=ac.person_id_sf
+  -- where
+  --    (
+  --     TrnActivityId LIKE 'ecom_%'
+  --     OR TrnActivityId LIKE 'ocado_%'
+  --   ) 
+  -- AND trn.TrnDate between v_30 and v_curr 
+)
+,StacjonarnyAktywny3Miesiace as (
+   select
+    distinct 
+    ac.person_id,
+    -- TrnLoyaltyAccountId as id,
+
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+    on trn.TrnLoyaltyAccountId=ac.person_id_sf
+  where
+     (
+      TrnActivityId LIKE 'ecom_%'
+      OR TrnActivityId LIKE 'ocado_%'
+    ) 
+  and trn.TrnDate between v_do3miesiecy and v_curr 
+)
+,StacjonarnyNiaktywnyZakupowo3Miesiace as (
+    select
+    distinct 
+    ac.person_id,
+    -- TrnLoyaltyAccountId as id,
+
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+    on trn.TrnLoyaltyAccountId=ac.person_id_sf
+  where
+     (
+      TrnActivityId LIKE 'ecom_%'
+      OR TrnActivityId LIKE 'ocado_%'
+    ) 
+  except DISTINCT 
+   select
+    distinct 
+    ac.person_id,
+    -- TrnLoyaltyAccountId as id,
+
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+    on trn.TrnLoyaltyAccountId=ac.person_id_sf
+  where
+     (
+      TrnActivityId LIKE 'ecom_%'
+      OR TrnActivityId LIKE 'ocado_%'
+    ) 
+  and trn.TrnDate between v_mniej3miesiace and v_curr
+ 
+)
+
+
+
+,zgodaNaMail
+as (
+  Select 
+  distinct person_id,
+  -- value,
+  -- channel_type,
+  -- flag_main_type,
+  -- optin_channel
+  -- count(1) OVER (PARTITION BY person_id) as ilePerson
+  FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+   where channel_type in ("CHT_04") and optin_channel=true and flag_main_type=true
+    
+)
+,zgodaTel
+as (
+    Select distinct person_id,
+    
+  -- value,
+  -- channel_type,
+  -- flag_main_type,
+  -- optin_channel,
+  -- count(1) OVER (PARTITION BY person_id) as ilePerson
+  FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+   where channel_type in ("CHT_05",'CHT_06') and optin_channel=true and flag_main_type=true
+  --  qualify ilePerson=2
+)
+,zgody as (
+  select distinct 
+  person_id,
+  from zgodaTel
+
+  UNION distinct
+  select distinct 
+  person_id,
+  from zgodaNaMail
+
+)
+  --  ("CHT_02")  and value like '+%'
+
+select
+ distinct 
+ a.person_id
+from StacjonarnyAktywny30dni a
+-- except distinct 
+-- select 
+--  where person_id not in (select person_id from zgody) 
+join 
+zgodaTel z 
+on a.person_id=z.person_id
+
+
+
+--  z on a.person_id=z.person_id
+ 
+
+--  zgodaNaMail
+-- zgodaTel
+-- StacjonarnyNiaktywnyZakupowo3Miesiace
+-- StacjonarnyAktywny30dni
+-- StacjonarnyAktywny3Miesiace
+
+-- channel_type
+-- CHT_05 ok 
+-- CHT_06 ok 
+-- CHT_08
+-- CHT_02
+-- )
+-- select * from 
+-- -- StacjonarnyNiaktywnyZakupowo3Miesiace 
+-- StacjonarnyAktywny30dni

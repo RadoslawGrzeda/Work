@@ -1,0 +1,79 @@
+  -- przygotuj proszę na poniedziałek (18/08/25) bazę klientów do mailingu:
+  -- - nr karty Skarbonka
+  -- - saldo na 17/08/25
+  -- - ID konta z SF
+  --  dzięki
+
+  --  że chodzi o wszystkich klientów, którzy będą mieli na koncie 20 PLN lub więcej.
+
+
+ with naKoncie AS (
+    SELECT
+      DISTINCT accountId 
+      AS AcId,
+      (pointsBalance / 100) +(delayedPoints / 100) AS cash
+    FROM
+      `auchan-pol-prod.raw_comarch.account_balance_histo` tp1
+    WHERE
+      balanceDATE IN (
+        SELECT
+          DISTINCT MAX(balanceDATE)
+        FROM
+          `auchan-pol-prod.raw_comarch.account_balance_histo` tp2
+        WHERE
+          tp1.accountId = tp2.accountId
+      AND pointTypeId = 1001
+      )
+      and pointTypeId=1001
+      -- and accountId=2187246
+
+  ), karty AS (
+    SELECT
+      DISTINCT 
+      ac.person_id,
+      -- ac.person_external_loyalty,
+      -- ac.account_loyalty,
+      ac.person_id_sf as idSF,
+      l.identifier_id AS nr_karty,
+      -- COUNT(*) OVER (PARTITION BY l.person_id) AS liczba_kart_sf,
+      ai.accountId AS acid,
+      ai.customerId
+    FROM
+      `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac
+      JOIN `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` l ON ac.person_id = l.person_id
+      JOIN `auchan-pol-prod.raw_comarch.account_identifier` ai ON ai.no = l.identifier_id
+      AND CAST(ai.accountId AS string) = ac.account_loyalty
+      AND CAST(ai.customerId AS string) = ac.person_external_loyalty
+      AND ai.status = 'A'
+    WHERE
+      l.is_deleted = FALSE
+      AND l.loyalty_status = 'LOS_01'
+  )
+  select 
+  nr_karty,
+  person_id,
+  cash
+  from karty k join naKoncie n on k.acid=n.AcId
+  where cash <20
+  order by 2,3 desc
+
+  -- where 
+  -- k.nr_karty='0410033848522'
+  -- SELECT
+  --   n.AcId,
+  --   nr_karty,
+  --   n.cash AS NaKoncieSkarbonki,
+  --   CASE
+  --     WHEN u.Zebrane >= n.cash THEN n.cash
+  --     ELSE u.Zebrane
+  --   END AS zebrane,
+  --   CASE
+  --     WHEN u.Zebrane >= n.cash THEN 0
+  --     ELSE n.cash - u.zebrane
+  --   END AS przepada
+  -- FROM
+  --   Na24 n
+  --   JOIN karty k ON n.AcId = k.acid
+  --   JOIN UzbieraneListopadGrudzien u ON k.acid = u.AcId
+  -- WHERE
+  --   n.cash > 20.0

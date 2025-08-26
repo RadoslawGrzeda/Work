@@ -1,7 +1,7 @@
 DECLARE v_dataStart,v_dataEnd DATE;
 DECLARE v_artList ARRAY<STRING>;
-SET v_artList=["69942","170130","890697"];
-SET v_dataStart='2025-06-27';
+SET v_artList=["69942","170130","890697"]; --produkty 
+SET v_dataStart='2025-06-27'; 
 SET v_dataEnd='2025-06-29';
 
 
@@ -59,6 +59,7 @@ select
   a2.nazwa,
   a2.nr,
   tl.TrnLineQuantity as ilosc,
+  tl.TrnLineValue as cena,
   count(TrnLineEan) over(partition by nr,pz.TrnDate) as art
 from
  `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` tl 
@@ -78,6 +79,7 @@ distinct
   agr.nr,
   agr.nazwa,
   ilosc as iloscKupionych,
+  cena,
   art as liczbaSprzedanychWCiaguDniaPrzezTychKlientow,
   DENSE_RANK() over(partition by TrnDate order by art desc) as rankingWCiaguDniaPrzezTychKlientow
 from agr  

@@ -1,84 +1,52 @@
-with art as (
-  select
-    ART_NUMER as nr,
-    ART_NAZWA as nazwa,
-    met.EAN_CD as ean
-  from
+
+WITH art AS (
+  SELECT
+    ART_NUMER AS nr,
+    ART_NAZWA AS nazwa,
+    met.EAN_CD AS ean
+  FROM
     `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
-    join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN -- where met.EAN_MAIT='O'
-    -- and cast(art_numer as string) in (select string_field_3 from `pol-it-digiteam-2022062900.RADEK.ListaProdPewniDobrego`)
-    and cast(art_numer as string) in (
-      '223946',
-      '579598',
-      '256250',
-      '654825',
-      '655859',
-      '655861',
-      '655863',
-      '657129',
-      '937222',
-      '937224',
-      '656193',
-      '848094',
-      '393301',
-      '55893',
-      '55895',
-      '55900',
-      '55901',
-      '505515',
-      '703140',
-      '944080',
-      '205960',
-      '948273',
-      '357026',
-      '406820',
-      '42421',
-      '373858',
-      '377197',
-      '377200',
-      '426300',
-      '426308',
-      '209262',
-      '484617',
-      '680601',
-      '362088',
-      '362090',
-      '200443',
-      '200444',
-      '218610',
-      '218646',
-      '446871',
-      '446872'
-    )
+    JOIN `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+      ON CAST(met.EAN_CD AS STRING) = am.EAN -- where met.EAN_MAIT='O'
+  -- and CAST(art_numer AS STRING) IN (SELECT string_field_3 FROM `pol-it-digiteam-2022062900.RADEK.ListaProdPewniDobrego`)
+  WHERE CAST(art_numer AS STRING) IN (
+    '223946', '579598', '256250', '654825', '655859', '655861', '655863', '657129',
+    '937222', '937224', '656193', '848094', '393301', '55893', '55895', '55900',
+    '55901', '505515', '703140', '944080', '205960', '948273', '357026', '406820',
+    '42421', '373858', '377197', '377200', '426300', '426308', '209262', '484617',
+    '680601', '362088', '362090', '200443', '200444', '218610', '218646', '446871', '446872'
+  )
 ),
-zakupy as(
-  select
-    distinct trn.TrnId as id,
-    -- TrnLoyaltyAccountId as karta ,
-    trnLin.TrnLineValue as obrot,
-    TrnLineQuantity as ilosc,
-    TrnLineEAN as ean
-  from
+
+zakupy AS (
+  SELECT DISTINCT
+    trn.TrnId AS id,
+    -- TrnLoyaltyAccountId AS karta,
+    trnLin.TrnLineValue AS obrot,
+    TrnLineQuantity AS ilosc,
+    TrnLineEAN AS ean
+  FROM
     `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
-    join `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` trnLin on trn.TrnId = trnLin.TrnId
-  where
-    trn.TrnDate between '2025-01-02'
-    and '2025-01-08'
-    and trnLin.TrnDate between '2025-01-02'
-    and '2025-01-08'
+    JOIN `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` trnLin
+      ON trn.TrnId = trnLin.TrnId
+  WHERE
+    trn.TrnDate BETWEEN '2025-01-02' AND '2025-01-08'
+    AND trnLin.TrnDate BETWEEN '2025-01-02' AND '2025-01-08'
     AND (
       TrnActivityId LIKE 'ecom_%'
       OR TrnActivityId LIKE 'ocado_%'
-    ) -- group by 1 
+    )
+  -- GROUP BY 1
 )
-select
-  a.nr as nrArt,
-  a.nazwa as nazwaArt,
-  sum(ilosc) as iloscArt,
-  sum(obrot) as ObrotArt -- count(di)
-from
+
+SELECT
+  a.nr AS nrArt,
+  a.nazwa AS nazwaArt,
+  SUM(ilosc) AS iloscArt,
+  SUM(obrot) AS ObrotArt -- count(di)
+FROM
   zakupy z
-  join art a on cast(z.ean as string) = cast(a.ean as string)
-group by
-  1,
-  2
+  JOIN art a ON CAST(z.ean AS STRING) = CAST(a.ean AS STRING)
+GROUP BY
+  a.nr,
+  a.nazwa

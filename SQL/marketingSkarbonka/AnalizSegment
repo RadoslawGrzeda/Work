@@ -54,3 +54,8 @@ join
   `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
 on
   lt.identifier_id=z.id
+
+
+  ---
+
+  

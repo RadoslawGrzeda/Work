@@ -41,8 +41,8 @@ from
   `auchan-pol-prod.raw_comarch.trans_trn`
 where
    locationCode like 'PL_006%'
-and
-   date >='2024-01-01'
+and 
+   date >='2024-01-01' 
 group by 1,2
 -- value_account_indicator
  )
