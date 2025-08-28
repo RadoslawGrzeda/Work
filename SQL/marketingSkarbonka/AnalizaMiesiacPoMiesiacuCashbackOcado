@@ -1,0 +1,120 @@
+-- Hej Radziu,
+
+-- prośba, żebyś zrobił w tym tygodniu takie podsumowanie dla e-com'u.
+-- cały rok 2024 i 2025 per miesiąc
+-- obrót
+-- obrót lojalny
+-- koszt przyznanego CB
+-- płatność Skarbonką 
+
+-- i teraz bardziej szczegółowo Skarbonka przyznana:
+-- ile to 0,5% ze statusu silver
+-- ile to 1,0% ze statusu gold
+-- ile to 1,5% ze statusu platinium
+-- ile to reszta przyznanego CB.
+with ecomLoy as (
+  select 
+  ac.person_id,
+  ac.person_id_sf as id, 
+  lt.identifier_id as karta
+  from 
+     `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+     join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt on ac.person_id=lt.person_id
+  
+)
+,satusKarty as (
+  SELECT 
+      account_IdentifierNo,
+       recognition_tierCode as status,
+      recognition_startDate
+       FROM `auchan-pol-prod.raw_comarch.loya_status` 
+)
+,pkt as (SELECT  
+identifierNO,
+
+date,
+-- ROW_NUMBER() over (partition by identifierNo,date),
+st.status,
+st.recognition_startDate,
+ comments,
+
+   regexp_extract(comments,r':\s*(\d+)\s*;') as transakcja,
+   regexp_extract(comments,r';\s*([^=]*)') as com,
+   regexp_extract(comments,r'=\s*([^\s]*)') as wartosc,
+   regexp_extract(comments,r'=\s*[-,+]\s*([^\s]*)') as cash,
+   
+   
+   
+   FROM auchan-pol-prod.raw_comarch.trans_trn trn 
+    join satusKarty st on (trn.identifierNo=st.account_IdentifierNo and st.recognition_startDate<=trn.date)
+    
+    where
+    trn.comments like 'Order number : %'
+    OR trn.comments like 'Order ID%' 
+    qualify ROW_NUMBER() over (partition by identifierNO,trn.date order by recognition_startDate desc)=1
+    order by 3 desc
+    
+)
+-- select * from pkt
+, zakupy  as (
+    select
+    
+    -- distinct 
+    ac.person_id,
+    TrnLoyaltyAccountId as id,
+    trn.Trndate as date,
+    TrnActivityId as trans,
+   regexp_extract(TrnActivityId,r'_(\d{13})_') as transakcja,
+    TrnTotalPayment,
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+    join `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+     on trn.TrnLoyaltyAccountId=ac.person_id_sf   
+  where
+     (
+      TrnActivityId LIKE 'ecom_%'
+      OR TrnActivityId LIKE 'ocado_%'
+    ) 
+    -- and TrnLoyaltyAccountId='001KC000008L8puYAC'
+    and date(TrnDate)='2025-08-26'
+)
+,agr as (select 
+distinct
+z.id,
+p.status,
+karta,
+z.date,
+z.transakcja,
+com,
+wartosc,
+cash,
+TrnTotalPayment as obrot
+from zakupy z left join ecomLoy ec  on z.id=ec.id left join pkt p on p.transakcja=z.transakcja and com='Cashback earned '
+)
+select 
+extract (year from date) as rok,
+extract (month from date) as miesiac,
+count(
+   case when karta is null then id  end
+ ) as liczbaNieLojalnych,
+ count(
+   case when karta is not null then id end
+ ) as LiczbaLojalnych,
+sum(
+  case when karta is null then obrot else 0 end
+ ) as obrotNieLojalny,
+sum(
+  case when karta is not null then obrot else 0 end
+ ) as ObrotLojalny,
+ sum(cast(cash as float64))/100 as cashbackPrzyznany,
+sum( 
+  case when status='Silver'then cast(cash as float64)/100 else 0 end
+) as cashSilver,
+sum( 
+  case when status='Gold'then cast(cash as float64)/100 else 0 end
+) as cashGold,
+sum( 
+  case when status='Platinium'then cast(cash as float64)/100 else 0 end
+) as cashPlatinium
+from agr
+group by 1,2

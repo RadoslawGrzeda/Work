@@ -65,8 +65,8 @@ with
   s.person_id,
   'SENIOR' as TypKlienta,
   cast(date_of_subscription as date) as DataSubskrypcji ,
-  case when flag_actif=true then 'AKTYWNY' else 'NIEAKTYWNY' end as Status,
- FROM
+  case when flag_actif=true then 'AKTYWNY' else 'NIEAKTYWNY' end as Status
+  FROM
    `auchan-pol-prod.raw_salesforce_customerbase_sec.community_member` s
   where community_code='COM_06' 
   and date_of_unsubscription is not null
