@@ -1,0 +1,168 @@
+DECLARE v_start, v_end DATE;
+set v_start='2025-08-29';
+set v_end='2025-08-31';
+-- Hej Radziu,
+
+-- złap mi pls wyniki tych akcji dla Skarbonki (obrót, ilość art, praragony, ilość klientów), ale per sklep:
+
+-- 1) 29-31 sierpnia'25 - nazwa rulki SK_T35_25_CB_50proc (art. papier. kat 267771)
+-- 2) 29-31 sierpnia'25 - nazwa rulki SK_T35_25_CB_50proc1 (oleje: kat. 165123)
+-- 3) 29-31 sierpnia'25 - nazwa rulki SK_T35_25_CB_50proc2 (prod do zmyw. 199613)
+
+-- vs takie same dane z daty 20-23 sierpnia 2025
+
+-- and tpd.date between v_start and v_end
+
+with papier as (
+  select 
+  -- am.*
+   ART_NUMER as nr,
+   ART_NAZWA as nazwa,
+   met.EAN_CD as ean
+   from 
+`pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+join 
+`pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+on cast (met.EAN_CD as string)=am.EAN
+where am.SEGMENT_KOD='267'
+and KATEGORIA_KOD='771'
+),
+olej as (
+  select 
+  -- am.*
+   ART_NUMER as nr,
+   ART_NAZWA as nazwa,
+   met.EAN_CD as ean
+   from 
+`pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+join 
+`pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+on cast (met.EAN_CD as string)=am.EAN
+where am.SEGMENT_KOD='165'
+and KATEGORIA_KOD='123'
+),
+zmyw as (
+  select 
+  -- am.*
+   ART_NUMER as nr,
+   ART_NAZWA as nazwa,
+   met.EAN_CD as ean
+   from 
+`pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+join 
+`pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+on cast (met.EAN_CD as string)=am.EAN
+where am.SEGMENT_KOD='199'
+and KATEGORIA_KOD='613'
+)
+,rulkaP as (
+
+  select 
+  pointsText,
+  srcTrlCode as code,
+  trnId
+  from 
+  -- `auchan-pol-prod.raw_comarch.trans_trr` -- docelowo
+  `pol-it-digiteam-2022062900.RADEK.TrnTrr2` 
+  where srcTrlCode in ('SK_T35_25_CB_50proc','SK_T35_25_CB_50proc1','SK_T35_25_CB_50proc2') 
+  -- ='SK_T35_25_CB_50proc'
+) 
+,rulkaO as (
+
+  select 
+  pointsText,
+  srcTrlCode as code,
+  trnId
+  from 
+  -- `auchan-pol-prod.raw_comarch.trans_trr` -- docelowo
+  `pol-it-digiteam-2022062900.RADEK.TrnTrr2` 
+  where srcTrlCode in ('SK_T35_25_CB_50proc1') 
+  -- ='SK_T35_25_CB_50proc'
+) 
+,rulkaZ as (
+
+  select 
+  pointsText,
+  srcTrlCode as code,
+  trnId
+  from 
+  -- `auchan-pol-prod.raw_comarch.trans_trr` -- docelowo
+  `pol-it-digiteam-2022062900.RADEK.TrnTrr2` 
+  where srcTrlCode in ('SK_T35_25_CB_50proc2') 
+  -- ='SK_T35_25_CB_50proc'
+) 
+select 
+locationCode,
+trn.date,
+r.code,
+trn.id,
+p.nazwa,
+tpd.quantity,
+tpd.value,
+trn.identifierNo,
+quantity,
+value
+-- trn.totalValue
+from
+`auchan-pol-prod.raw_comarch.trans_trn` trn
+-- join `auchan-pol-prod.raw_comarch.trans_tpd` tpd -- docelowo
+join `pol-it-digiteam-2022062900.RADEK.TrnTpd2` tpd
+on trn.id=tpd.trnId
+join rulkaP r on r.trnId=trn.id
+join papier p on CAST( p.ean AS STRING)=tpd.prdCode 
+where trn.date between v_start and v_end
+
+union all
+
+select 
+locationCode,
+trn.date,
+r.code,
+trn.id,
+p.nazwa,
+tpd.quantity,
+tpd.value,
+trn.identifierNo,
+quantity,
+value
+-- trn.totalValue
+from
+`auchan-pol-prod.raw_comarch.trans_trn` trn
+-- join `auchan-pol-prod.raw_comarch.trans_tpd` tpd -- docelowo
+join `pol-it-digiteam-2022062900.RADEK.TrnTpd2` tpd
+on trn.id=tpd.trnId
+join rulkaO r on r.trnId=trn.id
+join olej p on  CAST(p.ean AS STRING)=tpd.prdCode 
+where trn.date between v_start and v_end
+
+union all
+select 
+locationCode,
+trn.date,
+r.code,
+trn.id,
+p.nazwa,
+tpd.quantity,
+tpd.value,
+trn.identifierNo,
+quantity,
+value
+-- trn.totalValue
+from
+`auchan-pol-prod.raw_comarch.trans_trn` trn
+-- join `auchan-pol-prod.raw_comarch.trans_tpd` tpd -- docelowo
+join `pol-it-digiteam-2022062900.RADEK.TrnTpd2` tpd
+on trn.id=tpd.trnId
+join rulkaZ r on r.trnId=trn.id
+join zmyw p on  CAST(p.ean AS STRING)=tpd.prdCode 
+where trn.date between v_start and v_end
+-- 199613
+-- and 
+  -- Query error: No matching signature for operator = for argument types: INT64, STRING Signature: T1 = T1 Unable to find common supertype for templated argument <T1> Input types for <T1>: {INT64, STRING} at [74:23] at [16:1]
+
+-- where met.EAN_MAIT='O'
+-- and cast(art_numer as string) in (select string_field_3 from `pol-it-digiteam-2022062900.RADEK.ListaProdPewniDobrego`)
+-- and cast(art_numer as string) in (
+
+
+-- )
