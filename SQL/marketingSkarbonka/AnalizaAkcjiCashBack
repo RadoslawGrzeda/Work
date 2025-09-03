@@ -166,3 +166,193 @@ where trn.date between v_start and v_end
 
 
 -- )
+
+
+/* 
+DECLARE v_start, v_end DATE;
+-- set v_start='2025-08-29';
+set v_start='2025-08-20';
+-- set v_end='2025-08-31';
+set v_end='2025-08-23';
+-- Hej Radziu,
+
+-- złap mi pls wyniki tych akcji dla Skarbonki (obrót, ilość art, praragony, ilość klientów), ale per sklep:
+
+-- 1) 29-31 sierpnia'25 - nazwa rulki SK_T35_25_CB_50proc (art. papier. kat 267771)
+-- 2) 29-31 sierpnia'25 - nazwa rulki SK_T35_25_CB_50proc1 (oleje: kat. 165123)
+-- 3) 29-31 sierpnia'25 - nazwa rulki SK_T35_25_CB_50proc2 (prod do zmyw. 199613)
+
+-- vs takie same dane z daty 20-23 sierpnia 2025
+
+-- and tpd.date between v_start and v_end
+
+with papier as (
+  select 
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+  from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+  join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+  on 
+    cast (met.EAN_CD as string)=am.EAN
+  where
+     am.SEGMENT_KOD='267'
+  and
+     KATEGORIA_KOD='771'
+
+),olej as (
+  select 
+    ART_NUMER as nr,
+    ART_NAZWA as nazwa,
+    met.EAN_CD as ean
+  from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+  join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+  on cast (met.EAN_CD as string)=am.EAN
+  where
+     am.SEGMENT_KOD='165'
+  and
+     KATEGORIA_KOD='123'
+
+),zmyw as (
+  select 
+   ART_NUMER as nr,
+   ART_NAZWA as nazwa,
+   met.EAN_CD as ean
+  from 
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+  join 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+  on
+    cast (met.EAN_CD as string)=am.EAN
+  where
+    am.SEGMENT_KOD='199'
+  and
+    KATEGORIA_KOD='613'
+)
+,rulkaP as (
+  select 
+    pointsText,
+    srcTrlCode as code,
+    trnId
+  from 
+  `auchan-pol-prod.raw_comarch.trans_trr` -- docelowo
+    -- `pol-it-digiteam-2022062900.RADEK.TrnTrr2` 
+  where srcTrlCode in ('SK_T35_25_CB_50proc') 
+) 
+,rulkaO as (
+  select 
+    pointsText,
+    srcTrlCode as code,
+    trnId
+  from 
+  `auchan-pol-prod.raw_comarch.trans_trr` -- docelowo
+    -- `pol-it-digiteam-2022062900.RADEK.TrnTrr2` 
+  where srcTrlCode in ('SK_T35_25_CB_50proc1') 
+  -- ='SK_T35_25_CB_50proc'
+) 
+,rulkaZ as (
+  select 
+  distinct
+    pointsText,
+    srcTrlCode as code,
+    trnId
+  from 
+  `auchan-pol-prod.raw_comarch.trans_trr` -- docelowo
+    -- `pol-it-digiteam-2022062900.RADEK.TrnTrr2` 
+  where srcTrlCode ='SK_T35_25_CB_50proc2kor' 
+  -- ='SK_T35_25_CB_50proc'
+) 
+,agr as (
+  select 
+    locationCode,
+    trn.date,
+    'SK_T35_25_CB_50proc' as code ,
+    trn.id,
+    p.nazwa,
+    tpd.quantity,
+    tpd.value/100 as obrot,
+    trn.identifierNo,
+  from
+    `auchan-pol-prod.raw_comarch.trans_trn` trn
+join 
+`auchan-pol-prod.raw_comarch.trans_tpd` tpd -- docelowo
+  -- join
+    --  `pol-it-digiteam-2022062900.RADEK.TrnTpd2` tpd
+  on
+     trn.id=tpd.trnId
+  -- join
+  --    rulkaP r on r.trnId=trn.id
+  join
+     papier p on CAST( p.ean AS STRING)=tpd.prdCode 
+  where
+     trn.date between v_start and v_end
+
+union all
+
+  select 
+      locationCode,
+      trn.date,
+      'SK_T35_25_CB_50proc1'  as code,
+      trn.id,
+      p.nazwa,
+      tpd.quantity,
+      tpd.value/100 as obrot,
+      trn.identifierNo,
+      -- quantity,
+      -- trn.totalValue
+  from
+    `auchan-pol-prod.raw_comarch.trans_trn` trn
+  join `auchan-pol-prod.raw_comarch.trans_tpd` tpd -- docelowo
+  -- join
+    --  `pol-it-digiteam-2022062900.RADEK.TrnTpd2` tpd
+  on
+     trn.id=tpd.trnId
+  -- join
+  --    rulkaO r on r.trnId=trn.id
+  join
+     olej p on  CAST(p.ean AS STRING)=tpd.prdCode 
+  where
+     trn.date between v_start and v_end
+
+union all
+  select 
+      locationCode,
+      trn.date,
+      'SK_T35_25_CB_50proc2kor'  as code,
+      trn.id,
+      p.nazwa,
+      tpd.quantity,
+      tpd.value/100 as obrot,
+      trn.identifierNo,
+      -- quantity,
+      -- trn.totalValue
+  from
+    `auchan-pol-prod.raw_comarch.trans_trn` trn
+  -- join
+  join `auchan-pol-prod.raw_comarch.trans_tpd` tpd -- docelowo
+    --  `pol-it-digiteam-2022062900.RADEK.TrnTpd2` tpd
+  on
+     trn.id=tpd.trnId
+  -- join
+  --    rulkaZ r on r.trnId=trn.id
+  join
+     zmyw p on  CAST(p.ean AS STRING)=tpd.prdCode 
+  where
+     trn.date between v_start and v_end
+)
+  select 
+    locationCode,
+    '20-23 sierpnia 25' as kiedy,
+    code,
+    count(distinct identifierNo) as unikalniKlienci,
+    count(distinct id) as paragony,
+    sum(quantity) as ilosc,
+    sum(obrot) as obrot
+  from
+     agr
+  group by 1,2,3
+*/

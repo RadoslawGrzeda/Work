@@ -52,3 +52,6 @@ select
 from
   zakupy z
   join KlientZwykly k on z.id = k.id
+
+
+  5304121
