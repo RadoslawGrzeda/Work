@@ -1,0 +1,133 @@
+DECLARE v_date DATE;
+SET v_date=current_date()-1;
+
+CREATE TEMP TABLE test  as 
+(
+SELECT
+  tn.id,
+  tp.points,
+  pointTypeId,
+  tp.status,
+  tn.identifierNo,
+  tn.date,
+  tn.comments,
+  tn.receiptId,
+  tn.locationCode,
+  tn.totalValue,
+  regexp_extract(comments,r"Order ID : ([0-9]+)") as OrderId
+FROM 
+  `auchan-pol-prod.raw_comarch.trans_trn` tn 
+left join  
+`auchan-pol-prod.raw_comarch.trans_tpt` tp
+on
+   tp.trnid=tn.id
+where
+   tn.identifierNo like '049%'
+and
+   date(tn.date)=v_date
+);
+INSERT INTO `pol-it-digiteam-2022062900.RAPORTY.Karty_KSK` (
+-- CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RAPORTY.Karty_KSK` as (
+with modyfication as (
+  select 
+    a.OrderId,
+    a.id,
+    a.identifierNo,
+    a.points/100 as pt
+from
+   test a 
+where
+   comments  like '%Cashback spent modification%'
+),
+spend as (
+  select 
+  date,
+  id,
+  OrderId,
+  identifierNo,
+  points/100 as pt 
+from
+  test
+where
+  status='S'
+and
+   comments is not null and comments <> '' 
+),
+wEcom as (
+SELECT 
+   distinct
+   orderId,
+   min(date(orderStatusDateTime)) as dataZamowienia,
+   min(checkoutTotalItemsUndiscountedAmount) as obrot
+FROM
+  `pol-it-wh-prod-2019120200.POL_WH_OCADO_DATAFEEDS_PROD.raw_order_v8` v 
+where date(v.partition)=v_date
+group by 1
+)
+-- sklep
+,points as (
+select 
+  id,
+  case when status='W' or  status='B' and pointTypeId=1001 then points/100 end as earnd,
+  case when status='B' and pointTypeId=1002 then points end as points_earnd,
+  case when status='S' and pointTypeId=1001 then points/100 end as spend,
+from 
+  test
+where
+   (comments is null or comments = '' or comments =' ')
+)
+,agr as (
+select 
+  id
+  ,sum(earnd) as earnd,
+  sum(spend) as spend,
+  sum(points_earnd) as points
+from points 
+group by 1
+)
+SELECT
+distinct
+  receiptId as orderId,
+  locationCode as sklep,
+  trn.date as date,
+  trn.id,
+  trn.identifierNo karta,
+  trn.totalValue/100 as obrot,
+  tp.earnd as cashbackZarobion,
+  null as cashbackModyfikacja,  
+  tp.spend as cashbackWydany,
+FROM 
+  test trn
+join  
+agr tp
+on
+   tp.id=trn.id
+-- where
+--    trn.date>'2025-07-01' and Trn.date<'2025-12-01'
+
+UNION ALL
+
+select 
+distinct 
+  a.OrderId,
+  'ECOM' as sklep,
+  dataZamowienia as date,
+  a.id,
+  a.identifierNo as karta,
+  cast(obrot as FLOAT64) as obrot,
+  cast(a.points/100 as FLOAT64) as cashbackZarobion,
+  cast(m.pt as FLOAT64) as cashbackModyfikacja,
+  cast (s.pt as FLOAT64) as cashbackWydany
+from
+  test a 
+join
+  wEcom w on w.orderId=a.orderId
+left join spend as s 
+  on s.orderId= a.orderId and s.identifierNo=a.identifierNo
+left join
+  modyfication m on m.orderId=s.orderId and m.identifierNo=s.identifierNo
+where 
+  status='B'
+and comments not like '%Cashback spent modification%'
+ORDER BY DATE DESC 
+)

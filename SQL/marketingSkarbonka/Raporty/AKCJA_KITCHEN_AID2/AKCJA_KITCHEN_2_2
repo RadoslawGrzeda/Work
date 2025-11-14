@@ -1,0 +1,47 @@
+-- CREATE TEMP FUNCTION czy0(kwota FLOAT64)
+-- RETURNS FLOAT64 AS (
+--   if kwota==0.0
+-- )
+CREATE OR REPLACE TABLE  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_2` AS 
+(
+    SELECT DISTINCT
+        EXTRACT(ISOWEEK from bd.basket_sales_date) AS WEEK
+        ,current_date() AS data_raportu
+        ,CASE 
+            WHEN bh.basket_sales_date between '2025-11-01' AND '2025-11-19'
+      THEN 'OKRES PRZED AKCJA'
+    WHEN bh.basket_sales_date between '2025-11-20' AND '2026-01-14'
+                THEN 'OKRES AKCJI'
+            ELSE 'OKRES PO AKCJI'
+        END AS okres_badany
+        ,CASE 
+            WHEN bh.loy_support_unique_code is not null
+                THEN 'LOJALNY'
+            ELSE 'ZWYKLY'
+        END AS rodzaj_klienta
+        ,ed.SEGMENT_KOD
+        ,ed.KATEGORIA_KOD
+        ,ed.PODKATEGORIA_KOD
+        ,ed.EAN
+        ,ed.ART_NAZWA
+        ,round(sum(bd.final_amt_w_disc_w_tax), 2) AS obrot
+        ,count(distinct bh.basket_unique_code) AS liczba_transakcji
+        ,sum(bd.product_qty) AS liczba_produktow
+        ,if ((sum(bd.final_amt_w_disc_w_tax)>0.0), (round(sum(bd.final_amt_w_disc_w_tax)/count(distinct bh.basket_unique_code),2)),(0.0)) AS sredni_koszyk
+        ,if ((sum(bd.final_amt_w_disc_w_tax)>0.0),(round(sum(bd.final_amt_w_disc_w_tax)/sum(bd.product_qty), 2)),(0.0)) AS srednia_cena
+    FROM
+        `auchan-pol-prod.edm_sales.f_basket_header` bh
+    JOIN `auchan-pol-prod.edm_sales.f_basket_detail` bd
+        ON bh.basket_unique_code = bd.basket_unique_code
+    JOIN `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` pdf
+        ON pdf.EAN = RIGHT(LEFT(bd.prd_item_unique_code, 21), 13)
+    JOIN `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_2_SLOWNIK` ed
+        ON cast(ed.EAN as string)= pdf.EAN
+    WHERE
+        date(bh._partitiontime) between '2025-11-20' AND '2026-01-14'
+        AND date(bd._partitiontime) between '2025-11-20' AND '2026-01-14'
+         AND bh.site_code not in ('00217', '00225', '00227')
+        GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+-- ORDER BY 1, 4, 5, 6, 7
+)
+;

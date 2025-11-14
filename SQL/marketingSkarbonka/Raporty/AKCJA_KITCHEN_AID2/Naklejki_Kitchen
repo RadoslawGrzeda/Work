@@ -1,0 +1,66 @@
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.Naklejki_KITCHEN` AS
+
+
+
+select distinct a.TransactionDate, sum(AdvValue) as liczba_naklejek, ShopId,
+case when ClientCardNo is null or ClientCardNo ='0' then "Zwykly" else "Lojalny" end as rodzaj_klienta,
+c.site_sde, site_format_name
+                  FROM `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsadvantages` a
+                  join `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsheaders` h on a.TransactionDate = h.TransactionDate and a.LPSTrnId = h.LPSTrnId
+                  left join `pol-it-digiteam-2022062900.RADEK.site_do_kitchen`  c on h.ShopId = cast(c.GIC as int64)
+left join `pol-it-pol9012318-2021052100.WERKA_P.HYP_SUP` m on c.site_unique_code = m.site_unique_code
+                    WHERE 
+                    a.TransactionDate >= "2025-11-20"
+                    and 
+                    CampId in (
+                      200100125879,
+                      200100125878,
+                      200100125877,
+                      200100125876
+
+                    )
+                    
+                    -- CampId = 200100125518
+                    -- and Advid in (
+                    -- 200200325074,
+                    -- 200200325075,
+                    -- 200200325076,
+                    -- 200200325077,
+                    -- 200200325078,
+                    -- 200200325079,
+                    -- 200200325080,
+                    -- 200200325081,
+                    -- 200200325082,
+                    -- 200200325083,
+                    -- 200200325084,
+                    -- 200200325085
+                    -- )
+                    -- and c.site_external_code not like "POL%"
+                    -- and c.site_external_code not like "PL%"
+                    group by 1,3,4,5,6
+
+union all
+
+select distinct a.TransactionDate, sum(AdvValue) as liczba_naklejek, ShopId,
+case when ClientCardNo is null or ClientCardNo ='0'  then "Zwykly" else "Lojalny" end as rodzaj_klienta,
+c.site_sde, site_format_name
+                  FROM `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsadvantages_cdfb` a
+                  join `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsheaders_cdfb` h on a.TransactionDate = h.TransactionDate and a.LPSTrnId = h.LPSTrnId
+                  join `pol-it-digiteam-2022062900.RADEK.site_do_kitchen` c
+                  --  `pol-it-digiteam-2022062900.RAFAL_B.AKCJA_NOZE_GICA`  c 
+                  on h.ShopId = cast(c.GIC as int64)
+join `pol-it-pol9012318-2021052100.WERKA_P.HYP_SUP` m on c.site_unique_code = m.site_unique_code
+                    WHERE 
+                    a.TransactionDate >= "2025-11-20"
+                    and 
+                     CampId in (
+                      200100125879,
+                      200100125878,
+                      200100125877,
+                      200100125876
+
+                    )
+                    -- and c.site_external_code not like "POL%"
+                    -- and c.site_external_code not like "PL%"
+group by 1,3,4,5,6
+

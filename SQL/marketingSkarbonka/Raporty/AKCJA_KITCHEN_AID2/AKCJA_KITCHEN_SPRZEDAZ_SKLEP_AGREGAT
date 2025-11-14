@@ -1,0 +1,287 @@
+DECLARE v_data_start, v_data_koniec DATE;
+SET v_data_start = date('2025-11-20');
+SET v_data_koniec = date('2026-01-14');
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_STOCK_MAG` AS 
+(
+    SELECT DISTINCT 
+    st.SHOP_NR
+    , CASE
+        WHEN AST_CDMAG = 402
+          THEN 20
+            ELSE AST_CDMAG
+      END AS AST_CDMAG
+    , st.AST_NOART AS id_produktu
+    , sl.ART_NAZWA AS nazwa_prod
+    , st.AST_QTSTOCK AS stock
+    , g.site_sde AS nazwa_sklep
+    , g.site_unique_code
+  FROM 
+    `pol-it-wh-prod-2019120200.POL_WH_METI_STORE.raw_mgast` st
+  JOIN `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_2_SLOWNIK`  sl
+    ON sl.ART_NUMER = st.AST_NOART
+  LEFT JOIN
+          (
+            SELECT 
+              site_unique_code
+              ,site_sde
+              ,site_code
+              , CASE
+                    WHEN GIC = 20
+                      THEN 402
+                    ELSE GIC
+              END AS GIC
+            FROM
+            --  `pol-it-digiteam-2022062900.RAFAL_B.AKCJA_NOZE_GICA`
+          `pol-it-digiteam-2022062900.RADEK.site_do_kitchen`
+          ) g   
+    ON g.GIC = st.AST_CDMAG
+  WHERE 
+    date(current_timestamp_transfer) = current_date()
+    and  sl.czy_promocja = 'TAK'
+    AND g.site_code <> 'PL03000'
+)
+;
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SPRZEDANE_Z_UPUSTEM` AS
+WITH dict_prom AS (
+  SELECT 
+    dc.campId AS id_kampanii
+    ,dc.campName AS nazwa_kampanii
+    ,dc.campStartDate AS start_kampanii
+    ,dc.campEndDate AS koniec_kampanii
+    ,da.advId AS id_upust
+    ,da.advName AS nazwa_upust
+    ,'10 NAKLEJEK'AS rodzaj_upustu 
+    FROM
+    `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_datacampagne` dc
+    JOIN
+    `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_dataadvantage` da 
+    ON dc.campId = da.campId
+    WHERE 
+    dc.campId = 200100125518  
+)
+    SELECT
+    lad.LPSTrnId
+    ,lad.LineId
+    ,lad.TransactionDate
+    ,lad.CampId
+    ,lad.AdvId
+    ,dp.nazwa_upust
+    ,dp.rodzaj_upustu
+    ,count(*) OVER (PARTITION BY lad.LPSTrnId, lad.LineId) AS liczba_wystapien
+  FROM
+    `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsadvantages_cdfb` lad
+  JOIN 
+    dict_prom dp
+  ON dp.id_upust = lad.AdvId
+  WHERE
+    lad.TransactionDate between v_data_start AND v_data_koniec
+
+UNION ALL
+
+  SELECT
+    lad.LPSTrnId
+    ,lad.LineId
+    ,lad.TransactionDate
+    ,lad.CampId
+    ,lad.AdvId
+    ,dp.nazwa_upust
+    ,dp.rodzaj_upustu
+    ,count(*) OVER (PARTITION BY lad.LPSTrnId, lad.LineId) AS liczba_wystapien
+  FROM
+    `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsadvantages` lad
+  JOIN 
+    dict_prom dp
+  ON dp.id_upust = lad.AdvId
+  WHERE
+    lad.TransactionDate between v_data_start AND v_data_koniec
+;
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SPRZEDAZ_SKLEPY_DETAL` AS
+WITH lista_sklepow AS 
+(
+SELECT DISTINCT
+  msa.site_unique_code AS kod_sklepu
+  ,msa.site_sde AS nazwa_sklepu
+  ,RIGHT(msa.site_format_unique_code, 3) AS rodzaj_sklepu
+  ,gic.gic as nr_sklepu
+FROM 
+  `pol-it-bi-prod-2019121600.POL_BI_MDM.v_mdm_sites_all` msa
+JOIN 
+-- `pol-it-digiteam-2022062900.RAFAL_B.AKCJA_NOZE_GICA` gic
+  `pol-it-digiteam-2022062900.RADEK.site_do_kitchen` gic
+  ON CAST(msa.site_code AS INT64) = CAST(gic.site_code AS INT64)
+WHERE
+  gic.site_code <> 'PL03000'
+)
+SELECT DISTINCT
+  lh.LPSTrnId
+  ,lh.TransactionDate AS data_transakcji
+  ,lh.ShopId AS nr_sklepu
+  ,lsk.kod_sklepu
+  ,lsk.nazwa_sklepu
+  ,lsk.rodzaj_sklepu
+  , CASE
+        WHEN lh.TransactionDate between '2025-11-01' AND '2025-11-19'
+            THEN 'OKRES PRZED AKCJA'
+        WHEN lh.TransactionDate between '2025-11-20' AND '2026-01-14'
+            THEN 'OKRES AKCJI'
+        ELSE 'OKRES PO AKCJI'
+    END AS okres_badany 
+  ,CASE
+    WHEN lh.ClientCardNo = '0'
+      THEN 'ZWYKŁY'
+    ELSE
+      'LOJALNY'
+  END rodzaj_klienta
+  ,lh.ClientCardNo AS nr_skarbonka
+  ,lit.LineId AS pozycja_rach
+  ,lit.ArticleNumber  AS id_produktu
+  ,ans.ART_NAZWA
+  ,ans,ART_NUMER as numer_art
+  ,ans.EAN
+  ,ans.PODKATEGORIA_KOD
+  ,ans.KATEGORIA_KOD
+  ,lit.Amount AS liczba_art
+  ,lit.Price AS cena
+  ,lit.LpsDiscount AS wysokosc_upust
+  --,round(lit.Price - lit.LpsDiscount, 2) AS cena_koncowa
+  ,round(lit.Amount * lit.Price - lit.LpsDiscount, 2) AS cena_koncowa
+  ,lit.LoyaltyPayDiscount AS platnosc_skarbonka  
+  ,nwp.liczba_wystapien
+  --,nwp.nazwa_upust
+  ,CASE
+    WHEN nwp.nazwa_upust is null
+      THEN '100% ceny'
+    WHEN nwp.liczba_wystapien = 1
+      THEN nwp.rodzaj_upustu
+    WHEN round(lit.Amount * lit.Price - lit.LpsDiscount, 2)/lit.Amount = 0.01
+      THEN 'ZA 1GR'
+    ELSE
+      '10 NAKLEJEK'
+  END AS rodzaj_upust
+FROM 
+  `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsheaders_cdfb`  lh
+JOIN 
+  `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsitems_cdfb` lit
+  ON lit.LPSTrnId = lh.LPSTrnId
+  AND lit.TransactionDate = lh.TransactionDate
+JOIN
+  lista_sklepow lsk
+  ON lsk.nr_sklepu = lh.ShopId  
+JOIN 
+  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_2_SLOWNIK`  ans 
+  ON ans.ART_NUMER = lit.ArticleNumber
+LEFT JOIN 
+  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SPRZEDANE_Z_UPUSTEM` nwp
+  ON nwp.LPSTrnId = lit.LPSTrnId
+  AND nwp.LineId = lit.LineId
+WHERE   
+  lh.TransactionDate between v_data_start AND v_data_koniec
+  AND lit.TransactionDate between v_data_start AND v_data_koniec
+  AND ans.czy_promocja = 'TAK'  
+
+UNION ALL
+
+SELECT DISTINCT
+    lh.LPSTrnId
+  ,lh.TransactionDate AS data_transakcji
+  ,lh.ShopId AS nr_sklepu
+  ,lsk.kod_sklepu
+  ,lsk.nazwa_sklepu
+  ,lsk.rodzaj_sklepu
+  , CASE
+        WHEN lh.TransactionDate between '2025-11-01' AND '2025-11-19'
+            THEN 'OKRES PRZED AKCJA'
+        WHEN lh.TransactionDate between '2025-11-20' AND '2026-01-14'
+            THEN 'OKRES AKCJI'
+        ELSE 'OKRES PO AKCJI'
+    END AS okres_badany 
+  ,CASE
+    WHEN lh.ClientCardNo = '0'
+      THEN 'ZWYKŁY'
+    ELSE
+      'LOJALNY'
+  END rodzaj_klienta
+  ,lh.ClientCardNo AS nr_skarbonka
+  ,lit.LineId AS pozycja_rach
+  ,lit.ArticleNumber  AS id_produktu
+  ,ans.ART_NAZWA
+  ,ans,ART_NUMER as numer_art
+  ,ans.EAN
+  ,ans.PODKATEGORIA_KOD
+  ,ans.KATEGORIA_KOD
+  ,lit.Amount AS liczba_art
+  ,lit.Price AS cena
+  ,lit.LpsDiscount AS wysokosc_upust
+  --,round(lit.Price - lit.LpsDiscount, 2) AS cena_koncowa
+  ,round(lit.Amount * lit.Price - lit.LpsDiscount, 2) AS cena_koncowa
+  ,lit.LoyaltyPayDiscount AS platnosc_skarbonka  
+  ,nwp.liczba_wystapien
+  --,nwp.nazwa_upust
+  ,CASE
+    WHEN nwp.nazwa_upust is null
+      THEN '100% ceny'
+    WHEN nwp.liczba_wystapien = 1
+      THEN nwp.rodzaj_upustu
+    WHEN round(lit.Amount * lit.Price - lit.LpsDiscount, 2)/lit.Amount = 0.01
+      THEN 'ZA 1GR'
+    ELSE
+      '10 NAKLEJEK'
+  END AS rodzaj_upust
+FROM 
+  `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsheaders`  lh
+JOIN 
+  `pol-it-wh-prod-2019120200.POL_WH_LPS.raw_lpsitems` lit
+  ON lit.LPSTrnId = lh.LPSTrnId
+  AND lit.TransactionDate = lh.TransactionDate
+JOIN
+  lista_sklepow lsk
+  ON lsk.nr_sklepu = lh.ShopId  
+JOIN 
+  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_2_SLOWNIK` ans 
+  ON ans.ART_NUMER = lit.ArticleNumber
+LEFT JOIN 
+  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SPRZEDANE_Z_UPUSTEM` nwp
+  ON nwp.LPSTrnId = lit.LPSTrnId
+  AND nwp.LineId = lit.LineId
+WHERE   
+  lh.TransactionDate between v_data_start AND v_data_koniec
+  AND lit.TransactionDate between v_data_start AND v_data_koniec
+  AND ans.czy_promocja = 'TAK'
+;
+
+CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SPRZEDAZ_SKLEPY_AGREGAT` AS
+SELECT
+EXTRACT(ISOWEEK FROM det.data_transakcji) as tydzien
+, current_date() AS data_raport
+, det.okres_badany
+, det.nr_sklepu
+, det.nazwa_sklepu
+, det.rodzaj_sklepu
+, det.rodzaj_klienta
+, det.ART_NAZWA as nazwa_prod
+,det.numer_art
+, det.EAN
+, det.PODKATEGORIA_KOD
+, det.KATEGORIA_KOD
+, det.rodzaj_upust
+, mag.stock AS stock
+  ,CAST(sum(det.liczba_art) AS INT64) AS liczba_prod
+  ,round(sum(det.cena_koncowa), 2) AS obrot
+
+FROM
+`pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_SPRZEDAZ_SKLEPY_DETAL` det
+LEFT JOIN  `pol-it-digiteam-2022062900.RADEK.AKCJA_KITCHEN_STOCK_MAG` mag
+  ON mag.AST_CDMAG = det.nr_sklepu
+  AND mag.id_produktu = det.id_produktu 
+/*
+  WHERE  
+    nazwa_sklepu = 'PIASECZNO' 
+    AND det.ART_NAZWA = 'NÓŻ DO PIECZYWA ROYAL VKB' 
+    AND EXTRACT(ISOWEEK FROM det.data_transakcji) = 20 
+*/
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,14
+
+
