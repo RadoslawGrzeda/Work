@@ -1,0 +1,81 @@
+with klienciCzestochowy as (
+ SELECT
+  distinct 
+    ch.person_id,
+    person_id_sf as id
+  FROM 
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch 
+  join
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact`  ac
+  on 
+    ch.person_id=ac.person_id
+  where
+     lower(address_city) ='czestochowa'
+)
+,brakZgody as (
+ Select 
+    person_id,
+    value,
+    channel_type,
+    flag_main_type,
+    optin_channel
+ FROM
+    `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+ where
+    channel_type in ("CHT_04") and optin_channel=false
+)
+,zgoda as (
+  Select person_id,
+    value,
+    channel_type,
+    flag_main_type,
+    optin_channel
+  FROM
+     `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+  where
+     channel_type in ("CHT_04") and optin_channel=true
+)
+,brak as (
+  select
+     person_id
+  from
+     brakZgody
+  except distinct
+  select
+     person_id
+  from
+     zgoda
+)
+
+,zakupy as (
+  select
+    distinct TrnLoyaltyAccountId as id,
+  from
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  where
+    trn.TrnDate between '2023-01-01'
+    and '2025-09-08'
+    AND (
+      TrnActivityId LIKE 'ecom_%'
+      OR TrnActivityId LIKE 'ocado_%'
+        )
+)
+,agr  as (
+select 
+ id
+from
+ klienciCzestochowy k
+except distinct  
+select 
+ id
+from
+ zakupy z 
+)
+select 
+ k.person_id
+from 
+ klienciCzestochowy k 
+join 
+ brak
+on 
+ k.person_id=brak.person_id

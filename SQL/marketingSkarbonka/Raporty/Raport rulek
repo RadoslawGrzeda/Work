@@ -1,0 +1,28 @@
+declare v_date_start DATE;
+SET v_date_start =current_date()-14;
+
+CREATE OR REPLACE TABLE pol-it-digiteam-2022062900.RAPORTY.Rulki_Wojtek AS (
+select 
+  date(trn.date) as date,
+  trn.identifierNo,
+  locationCode,
+  trr.pointsText,
+  cast(regexp_extract(pointsText,r"AUCH_PT: ([0-9]+)") as int64)/100 as cb,
+  trr.srcTrlCode,
+  trr.discount/100 as discount
+from
+   `auchan-pol-prod.raw_comarch.trans_trn` trn
+join
+   `auchan-pol-prod.raw_comarch.trans_trr` trr
+on
+   trn.id=trr.trnid
+where
+   trn.identifierNo is not null 
+and
+   date>=v_date_start
+and 
+(lower(srcTrlCode) like 't%' or lower(srcTrlCode) like 'sk%' or lower(srcTrlCode) like 'kdr%' or lower(srcTrlCode) like 'SWC%'
+or lower(srcTrlCode) like 'wpc%' or lower(srcTrlCode) like 't%' or lower(srcTrlCode) like 'sch%')
+and srcTrlCode != 'TOTE_BAG_OFFER'
+and srcTrlCode != 'KDR_5%_MDD_1'
+)

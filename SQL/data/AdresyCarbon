@@ -1,0 +1,76 @@
+CREATE TEMP TABLE adresZGEO as (
+  SELECT  
+  -- distinct 
+person_id,
+flag_main_type,
+channel_type,
+value,
+address_x_position,
+address_y_position,
+count(person_id) over (partition by person_id ) as ileperson,
+row_number() over (partition by person_id order by flag_main_type desc,channel_type) as row
+FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+where address_x_position is not null 
+and address_address is not null and address_address <> 'x'
+and channel_type in ('CHT_03','CHT_02','CHT_01')
+qualify row=1
+-- order by ileperson
+
+);
+CREATE TEMP TABLE adresBezGEO as (
+  SELECT  
+  -- distinct 
+person_id,
+flag_main_type,
+channel_type,
+value,
+address_x_position,
+address_y_position,
+count(person_id) over (partition by person_id ) as ileperson,
+row_number() over (partition by person_id order by flag_main_type desc,channel_type) as row
+FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` ch
+
+where address_x_position is null 
+and channel_type in ('CHT_03','CHT_02','CHT_01')
+and address_address is not null and address_address <> 'x'
+and not exists (SELECT 1 FROM adresZGEO az where az.person_id=ch.person_id)
+qualify row=1
+-- qualify ileperson>3
+-- order by ileperson desc, person_id, row  
+
+);
+
+-- select * from `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` where person_id='8859997700100'
+-- select 
+-- * from 
+-- adresZGEO
+-- where person_id='0017S00000mv2R4QAI'
+select * from adresBezGEO
+union all 
+select * from adresZGEO 
+-- order by 2 desc
+-- select person_id, count(1)from adres group by 1
+
+
+-- select 
+-- distinct channel_type
+-- from `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+-- where adre is not null 
+
+-- channel_type
+-- CHT_04
+-- x
+-- CHT_02 -> adres korespondencji
+-- CHT_06
+-- CHT_05
+-- CHT_03
+-- CHT_01
+
+-- select 
+-- *
+-- from `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+-- and address_address is not null
+-- where channel_type in ('CHT_01')
+
+-- where person_id='8829904814084'
+-- pol-it-digiteam-2022062900.mar_data.ct_05

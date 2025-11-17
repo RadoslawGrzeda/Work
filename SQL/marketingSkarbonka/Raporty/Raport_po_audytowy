@@ -1,0 +1,47 @@
+DECLARE v_date date;
+SET v_date =current_date()-1;
+
+-- CREATE OR REPLACE TABLE `pol-it-digiteam-2022062900.RAPORTY.Audyt_NIP` as (
+INSERT INTO `pol-it-digiteam-2022062900.RAPORTY.Audyt_NIP`  (
+with klient as (
+  SELECT 
+  lt.person_id,
+  lt.identifier_id,
+  ac.intracommunity_vat_number,
+  ac.company_name
+FROM
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact`  ac 
+join
+   `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+on
+   ac.person_id=lt.person_id
+where
+   intracommunity_vat_number is not null 
+)
+,zakupy as (
+select 
+  TrnId,
+  TrnDate,
+  TrnStore,
+  TrnTotalPayment,
+  TrnLoyaltyCustomerId,
+  TrnCustomerVatId,
+from
+   `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` 
+where
+   trndate=v_date
+and 
+  TrnCustomerVatId is not null 
+ )
+select 
+distinct 
+  z.*,
+  company_name
+from
+   zakupy z
+join
+   klient k
+on
+k.identifier_id=z.TrnLoyaltyCustomerId
+order by TrnDate desc
+)

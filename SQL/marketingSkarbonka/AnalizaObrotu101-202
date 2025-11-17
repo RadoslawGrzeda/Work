@@ -1,0 +1,45 @@
+DECLARE v_dataStart, v_dataEnd DATE;
+DECLARE v_kwota INT64;
+SET v_dataStart='2024-11-22';
+SET v_dataEnd='2024-11-23';
+set v_kwota=300;
+
+WITH art AS (
+  SELECT
+    ART_NUMER AS nr,
+    ART_NAZWA AS nazwa,
+    met.EAN_CD AS ean
+  FROM
+    `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
+    JOIN `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met
+      ON met.EAN_NOART  = am.ART_NUMER
+  WHERE am.SEGMENT_KOD between '101' and '202'
+),
+zakupy AS (
+  SELECT DISTINCT
+    trn.TrnId AS id,
+    trnLin.TrnLineValue AS obrot,
+    TrnLineQuantity AS ilosc,
+    TrnLineEAN AS ean
+  FROM
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader` trn
+  JOIN `pol-it-cloudtrn-2021042100.TrnCloud.TrnLine` trnLin
+  ON trn.TrnId = trnLin.TrnId
+  WHERE
+    trn.TrnDate BETWEEN v_dataStart and v_dataEnd
+  AND 
+    trnLin.TrnDate BETWEEN v_dataStart and v_dataEnd  
+    )
+
+,agr as (
+SELECT
+  id,
+  sum(obrot)
+FROM
+  zakupy z
+JOIN
+   art a ON CAST(z.ean AS STRING) = CAST(a.ean AS STRING)
+GROUP BY 1
+having sum(obrot)>=v_kwota
+)
+select count(distinct id) from agr 
