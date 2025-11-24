@@ -1,0 +1,49 @@
+with klienciZNipem as (
+select 
+distinct 
+    TrnLoyaltyCustomerId
+from 
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader`
+wher e
+     TrnCustomerVatId is not null 
+and 
+    trndate>='2025-01-01'
+)
+,ecom as (
+select 
+distinct 
+    TrnLoyaltyAccountId
+from 
+    `pol-it-cloudtrn-2021042100.TrnCloud.TrnHeader`
+where
+     TrnLoyaltyAccountId is not null 
+-- and trndate>='2025-01-01'
+),
+czestochowa as (
+SELECT
+distinct
+  person_id
+FROM `auchan-pol-prod.raw_salesforce_customerbase_sec.channel`
+where
+ lower(address_city) ='częstochowa' or lower(address_city)='czestochowa'
+)
+,ac as (
+SELECT
+distinct
+  ac.person_id,
+  person_id_sf,
+  lt.identifier_id as karta
+FROM
+     `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac 
+join
+     `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt 
+on
+     ac.person_id=lt.person_id
+  
+)
+select 
+a.person_id
+from klienciZNipem k 
+join ac a on k.TrnLoyaltyCustomerId=a.karta
+join czestochowa c on c.person_id=a.person_id
+where a.person_id_sf not in (select TrnLoyaltyAccountId from ecom)
