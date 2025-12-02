@@ -1,10 +1,38 @@
 -- dociągnij tu pls, tak jak ostatnio, czy karta jest aktywna, czy jest status pracownika, czy jest i jaki adres e-mail, czy ma DA. Jakbyś dał radę do końca dnia, było by git.
 
 with karty as (
-  select 
-    IF(cast(Numer_karty_Skarbonka as string) like '4%',CONCAT('0',cast(Numer_karty_Skarbonka as string)),cast(Numer_karty_Skarbonka as string)) as karta
-  from 
-    `pol-it-digiteam-2022062900.RADEK.NoweKarty`
+select identifier_id as karta from `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty`
+where identifier_id in (
+'0410012766847',
+'0410040981052',
+'0410042766565',
+'0410042765872',
+'0410042764288',
+'0450012758831',
+'0450026546233',
+'0410064790647',
+'0410067808622',
+'0410029676573',
+'0410038617550',
+'0410057591220',
+'0410057606603',
+'0410062636206',
+'0450027084505',
+'0410051678941',
+'0410066781209',
+'0410063449386',
+'0410038486903',
+'0410067259912',
+'0410068406735',
+'0410019222667',
+'0410028186172',
+'0410040851232',
+'0410062250228',
+'0410066908859',
+'0410025296218',
+'0410054050423',
+'0410016334080'
+)
 )
 ,pracownik as (
   select 
@@ -34,10 +62,11 @@ with karty as (
    from 
   `auchan-pol-prod.raw_salesforce_customerbase_sec.channel` 
   where channel_type='CHT_04'
+  
   )
   ch on lt.person_id=ch.id
   left join 
-  `auchan-pol-prod.raw_salesforce_customerbase_sec.account_contact` ac on ac.person_id=lt.person_id
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.user` ac on ac.person_id=lt.person_id
   -- where ch.channel_type
   -- ='CHT_04'
   -- Where identifier_id='0410013104266'
@@ -48,3 +77,4 @@ o.*,
 IF (p.person_id is null,'NIE','TAK') as czy_pracownik
 from karty k left join info o on k.karta=o.karta
 left join pracownik p on p.person_id=o.person_id
+
