@@ -32,16 +32,16 @@ SELECT
 trn.id,
 trn.locationCode,
 date(trn.date) as date, 
- srcTrlCode as code ,
- identifierNo,
- pointsText,
- discount
+--  srcTrlCode as code ,
+ identifierNo as karta
+--  pointsText,
+--  discount
 -- trr.*
-FROM `auchan-pol-prod.raw_comarch.trans_trn` trn join
-`pol-it-digiteam-2022062900.RADEK.TrnTesty` trr on trn.id=trr.trnId
+FROM `auchan-pol-prod.raw_comarch.trans_trn` trn 
+-- `pol-it-digiteam-2022062900.RADEK.TrnTesty` trr on trn.id=trr.trnId
 
  WHERE  date >='2025-10-01' 
- and locationCode='PL_00639_MAG'
+ and locationCode like 'PL_006%'
 
 )
 
@@ -78,7 +78,8 @@ art as (
   a.nr,
   quantity,
   value/100 as obrot,
-  prdCodeId as prdId
+  prdCodeId as prdId,
+  prdCode as prdCode
 from
   
 `pol-it-digiteam-2022062900.RADEK.tpd_OdPazd` tp 
@@ -86,90 +87,118 @@ join art a on tp.prdCode=cast (a.EAN as string)
 )
 
 ,unnestCod as (
-
   select 
   k.code,
   p as prdId
   from kody k join unnest(prod) as p
 )
 -- select * from unnestCod
+,statusUz as (
+select 
+  s1.person_id,
+  l.identifier_id,
+  "PRACOWNIK" as typ,
+  'coomunityCode' as community_code,
+  DataSubskrypcji  as date_of_subscription,
+  true,
+  current_timestamp() as date_of_unsubscription
+-- -- *
+from `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` s1 
+join `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` l on l.person_id=s1.person_id
+where  DataGenerowania in 
+(
+select max(DataGenerowania)
+from `pol-it-digiteam-2022062900.RADEK.SeniorKdrPracownik` s2 where s1.person_id=s2.person_id)
+and Status='AKTYWNY'
+and TypKlienta='PRACOWNIK'
+)
 
+,Senior as (
+  SELECT 
+    lt.person_id,
+     lt.identifier_id,
+    'SENIOR' as typ,
+    community_code,
+    date(date_of_subscription) as date_of_subscription, 
+    flag_actif,
+    -- date_of_unsubscription,
+    IF (date_of_unsubscription is null ,current_timestamp(),date_of_unsubscription) as date_of_unsubscription
+   FROM 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.community_member` mb join
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on mb.person_id=lt.person_id
+  where community_code='COM_06'
+  -- and person_id='8854735159300'
+)
+
+    ,KDR as (
+  SELECT 
+    lt.person_id,
+    lt.identifier_id,
+    'KDR' as typ,
+    community_code,
+    date(date_of_subscription) as date_of_subscription,
+    flag_actif,
+    IF (date_of_unsubscription is null ,current_timestamp(),date_of_unsubscription) as date_of_unsubscription
+  FROM 
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.community_member` mb join
+  `auchan-pol-prod.raw_salesforce_customerbase_sec.loyalty` lt
+  on mb.person_id=lt.person_id
+  where community_code='COM_03'
+ )
+ ,wszystkoZeSkarbonki as (
+ select 
+    person_id,
+     identifier_id,
+    typ,
+    community_code,
+    date_of_subscription,
+    flag_actif,
+    date_of_unsubscription
+ from senior
+ union all
+ select    
+ person_id,
+  identifier_id,
+    typ,
+    community_code,
+    date_of_subscription,
+    flag_actif,
+    date_of_unsubscription from kdr
+    union all
+    select 
+  * from statusUz
+ )  
+ ,agr as (
 select
 distinct 
 t.id,
 locationCode,
-t.date, 
-t.code,
-identifierNo,
-k.prdId,
+t.date,
+karta,
+w.typ,
+prdId,
+prdCode,
 quantity,
-obrot,
-t.pointsText,
-t.discount
+obrot
 from 
 trans t 
-join unnestCod k on t.code = k.code
-join prod p on p.trnId=t.id and cast(p.nr as string)=k.prdId
-order by id desc 
--- join unnest(k.prod) as prod
--- -- select * from kody 
--- ,transakcja as (
--- SELECT 
---   trn.id,
---   identifierNo as karta,
---   date,
---   totalValue as val,
---   locationCode,
---   pointsText,
---   srcTrlCode as kod,
---   discount
---  FROM
---   `auchan-pol-prod.raw_comarch.trans_trn` trn
---   JOIN `auchan-pol-prod.raw_comarch.trans_trr` trr on trn.id=trr.trnid
---   JOIN `pol-it-digiteam-2022062900.RADEK.swc2` sw on sw.string_field_0=trr.srcTrlCode
---   where date(trn.date)='2025-08-07'
-
--- )
---  ,art as (  
---   select
---     k.kod,
---     ART_NUMER as nr,
---     ART_NAZWA as nazwa,
---     met.EAN_CD as ean
---   from
---     `pol-it-analytics-2019120200.POL_BD_MARZA.v_dic_artykul_nomenklatura` am
---     join `pol-it-wh-prod-2019120200.POL_WH_METI_CENTRAL.raw_mgean` met on cast (met.EAN_CD as string) = am.EAN 
---   -- where ART_NUMER in (select p from kody join unnest(prod) as p)
---   join kody k on cast(ART_NUMER as string) in unnest(prod)
--- )
--- -- select * from art 
--- -- select * from transakcja
-
--- ,szczegol as ( 
---   select
---    trnId,
---    prdId,
---    quantity,
---    value,
---    prdCode 
---   from `auchan-pol-prod.raw_comarch.trans_tpd`
--- )
-
-
-
-
--- SELECT 
---   id,
---   karta,
---   date(date) as data,
---   locationCode as lokalizacja,
---   t.kod,
---   a.nr,
---   a.nazwa
-
--- FROM 
--- transakcja t
--- join szczegol s
--- on t.id=s.trnid
--- join art a on cast(a.ean as string)=s.prdCode
--- and a.kod=t.kod
+join prod p on p.trnId=t.id 
+left join wszystkoZeSkarbonki w on w.identifier_id=t.karta and t.date between date(w.date_of_subscription) and date(w.date_of_unsubscription)
+left join statusUz u on u.identifier_id=t.karta
+-- left join statusUz s on s.identifier_id=t.karta and date > DataSubskrypcji
+)
+-- select * from agr
+select 
+  locationCode,
+  date,
+  prdId,
+  prdCode,
+  typ,
+  count(distinct karta) as unikalnyKlient,
+  sum(quantity) as liczbaProd,
+  sum(obrot) as obrot
+from agr 
+group by 1,2,3,4,5
+order by prdId
+-- select * from agr
