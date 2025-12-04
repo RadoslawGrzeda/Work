@@ -42,7 +42,7 @@ with test as (
         a.cre_date,
         b.recognition_tierCode
       FROM
-        auchan - pol - prod.raw_comarch.loya_status b
+        auchan-pol-prod.raw_comarch.loya_status b
         join (
           SELECT
             account_id,
@@ -50,7 +50,7 @@ with test as (
             account_IdentifierNo,
             max(cre_date) as cre_date
           from
-            auchan - pol - prod.raw_comarch.loya_status --where account_IdentifierNo ='0410014653640'
+            auchan-pol-prod.raw_comarch.loya_status --where account_IdentifierNo ='0410014653640'
           group by
             account_id,
             account_ownerCustomerId,
@@ -104,8 +104,8 @@ from
     FROM
       test
     where
-      date(date) between '2025-03-01'
-      and '2025-03-31'
+      date(date) between '2025-11-01'
+      and '2025-11-30'
       and pointTypeId = 1001 --and typ_pkt='ZEBRANE'
       and status = 'W' -- and transaction_type_code ='ER'
     group by
